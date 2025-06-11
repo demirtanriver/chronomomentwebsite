@@ -1,10 +1,9 @@
 from django.shortcuts import render
 from django.http import HttpResponse
-
+from .models import Stories
 # Create your views here.
 
-def index(response):
-    return HttpResponse("<h1>test view!</h1>")
+def index(response,id):
+    st = Stories.objects.get(id=id)
+    return HttpResponse("<h1>%s</h1>"%st.main_message)
 
-def v1(response):
-    return HttpResponse("<h1>view 1!</h1>")
