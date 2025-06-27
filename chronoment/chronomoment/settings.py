@@ -122,3 +122,29 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Add your custom authentication backend
+# The path should be 'your_app_name.backends.OrganiserBackend'
+# Make sure to keep 'django.contrib.auth.backends.ModelBackend' if you want
+# to use Django's default User model (e.g., for Django Admin).
+AUTHENTICATION_BACKENDS = [
+    'main.backends.OrganiserBackend', # Your custom backend
+    'django.contrib.auth.backends.ModelBackend', # Django's default
+]
+
+# Optional: Tell Django what model your custom backend is managing users for
+# This is mainly for internal Django mechanisms and some third-party apps.
+# It doesn't replace the need for the custom backend for email login.
+AUTH_USER_MODEL = 'main.Organisers' # Use this if Organisers is your ONLY user model
+
+# Set the URL where Django will redirect users who are not logged in
+# (e.g., for @login_required decorator)
+LOGIN_URL = '/login/' # Or whatever your login URL name is, e.g., 'login'
+
+# URL to redirect after successful login (if not specified elsewhere)
+LOGIN_REDIRECT_URL = '/home/' # Or your actual home/dashboard URL
+
+# URL to redirect after logout
+LOGOUT_REDIRECT_URL = '/login/' # Or where you want users to go after logout
+
+# ... rest of your settings ...

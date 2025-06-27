@@ -1,51 +1,100 @@
+<!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chronoment Website - {% block page_title %}{% endblock page_title %}</title>
+    {# Load Inter font, recommended for modern UI #}
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    {# CRITICAL FIX: Ensure Tailwind CSS CDN is loaded correctly and early in the head #}
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <style type="text/css">
+        /* Essential: Ensure html and body fill the entire viewport height */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f8f8; /* A light background for the page */
+        }
+
         .sidenav {
             height:100%;
             width:160px;
-            position: fixed;
+            position: fixed; /* Keep fixed position */
             z-index:1;
             top:0;
             left:0;
             background-color:#111;
             overflow-x: hidden;
-            padding-top: 10px;
+            padding-top: 20px;
+            box-sizing: border-box;
         }
 
         .sidenav a {
-            padding: 6px 9px 6px 16px;
+            padding: 15px 16px;
             text-decoration: none;
-            font-size: 25px;
+            font-size: 22px;
             color:#818181;
-            display:block
+            display:block;
+            white-space: nowrap;
+            transition: color 0.2s, background-color 0.2s;
         }
 
         .sidenav a:hover{
-            color:#f1f1f1
+            color:#f1f1f1;
+            background-color: #333;
         }
 
         .main{
-            margin-left: 160px; 
-            padding: 0px 10px; 
-
+            margin-left: 180px; /* 160px (sidebar width) + 20px (desired gap) */
+            padding: 20px 20px; /* Consistent padding around content */
+            min-height: 100vh; /* Ensure main content area is at least viewport height */
+            box-sizing: border-box;
+        }
+        
+        /* Custom CSS to ensure textarea content starts at the top (can be here or in specific templates) */
+        textarea {
+            vertical-align: top;
+            text-align: left;
         }
     </style>
-    <title>Chronoment Website</title>
-
 </head>
 
 <body>
     <div class="sidenav">
-        <a href="/">Home</a>
-        <a href="/signup">Signup</a>
+        <a href="{% url 'home' %}">Home</a> {# Use Django URL tag #}
+        <a href="{% url 'register' %}">Register</a> {# Use Django URL tag #}
+        <a href="{% url 'login' %}">Login</a> {# Use Django URL tag #}
+        <a href="{% url 'create_story' %}">Create Story</a> {# Use Django URL tag #}
+        {% if user.is_authenticated %}
+            <a href="{% url 'logout' %}">Logout</a> {# Show logout if user is logged in #}
+        {% endif %}
+        {# Add other navigation links here #}
     </div>
 
 
-    <div id="content", name="content", class="main">
-        {% block content%}
-        {% endblock%}
+    <div id="content" name="content" class="main">
+        {# Display Django messages here, as they are often used across pages #}
+        {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                    <div class="px-4 py-3 rounded-md relative mb-2
+                        {% if message.tags == 'success' %}bg-green-100 border border-green-400 text-green-700{% endif %}
+                        {% if message.tags == 'error' %}bg-red-100 border border-red-400 text-red-700{% endif %}
+                        {% if message.tags == 'info' %}bg-blue-100 border border-blue-400 text-blue-700{% endif %}">
+                        <span class="block sm:inline">{{ message }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}
+            {# Default content for pages that don't define their own 'content' block #}
+        {% endblock content %}
     </div>
 </body>
-
 </html>

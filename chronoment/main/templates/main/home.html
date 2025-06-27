@@ -1,5 +1,60 @@
-{% extends 'main/base.html'%}
+{# your_app_name/templates/your_app_name/home.html #}
+{% extends 'main/base.html' %} {# Extends your base layout with the sidebar #}
+{% load static %} {# If you need to link to static files like images later #}
 
-{% block content%}
-<h1>Home Page</h1>
-{% endblock%}
+{% block content %}
+<div class="container mx-auto px-4 py-8"> {# Added a container for max-width and padding #}
+    <div class="text-center mb-12">
+        <h1 class="text-5xl font-extrabold text-gray-900 leading-tight mb-4">
+            Welcome to <span class="text-indigo-600">Chronoment, {{user.first_name}}!</span>
+        </h1>
+        <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+            Capture and share the magic of time-locked memories. Create heartfelt stories with friends and family,
+            revealed only when the moment is just right.
+        </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+        {# Section for Organisers #}
+        <div class="bg-white p-8 rounded-xl shadow-lg flex flex-col items-center text-center">
+            <h3 class="text-2xl font-bold text-gray-800 mb-4">For Organisers</h3>
+            <p class="text-gray-700 mb-6">
+                Take the lead! Set up unique "Stories," invite your chosen senders,
+                and decide the perfect reveal date for a truly special memory capsule.
+            </p>
+            <!-- Changed "Chronomoment" to "Chronoment" -->
+            <!-- <div class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <svg class="w-5 h-5 mr-2 -ml-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
+                Create a New Story
+            </div> -->
+        </div>
+
+        {# Section for Senders & Receivers #}
+        <div class="bg-white p-8 rounded-xl shadow-lg flex flex-col items-center text-center">
+            <h3 class="text-2xl font-bold text-gray-800 mb-4">For Senders & Receivers</h3>
+            <p class="text-gray-700 mb-6">
+                Contribute photos, videos, or messages to a story you're invited to,
+                or scan a QR code on the reveal date to unlock a beautiful collection of memories.
+            </p>
+            <!-- <div class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-indigo-700 bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Learn More
+                <svg class="w-5 h-5 ml-2 -mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+            </div> -->
+        </div>
+    </div>
+
+    <div class="text-center mt-12 pt-8 border-t border-gray-200">
+        <h4 class="text-xl font-semibold text-gray-700 mb-4">Ready to begin your Chronoment journey?</h4>
+        <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <!-- Changed "Chronomoment" to "Chronoment" -->
+            <div class="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                Join Chronoment
+            </div>
+            <div class="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-green-700 bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                Sign In
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,102 @@
+{# your_app_name/templates/your_app_name/login.html #}
+{% extends 'main/base.html' %} {# Extend your base layout #}
+{% load static %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+        <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">Login</h2>
+
+        {# Display messages here, just like in your register template #}
+        {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                    <div class="px-4 py-3 rounded-md relative mb-2
+                        {% if message.tags == 'success' %}bg-green-100 border border-green-400 text-green-700{% endif %}
+                        {% if message.tags == 'error' %}bg-red-100 border border-red-400 text-red-700{% endif %}">
+                        <span class="block sm:inline">{{ message }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {# Display non-field errors at the top if any #}
+        {% if form.non_field_errors %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-6" role="alert">
+                <strong class="font-bold">Oops!</strong>
+                <span class="block sm:inline">Please correct the following errors:</span>
+                <ul class="list-disc pl-5 mt-2">
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        {# Proper Login Form Starts Here #}
+        <form method="post" action="{% url 'login' %}" class="space-y-6">
+            {% csrf_token %} {# Always include this for security! #}
+
+            {# Hidden fields #}
+            <!-- {{ form.hidden_fields }} {# Uncommented this line #} -->
+
+            {# Username/Email Field (Django's AuthenticationForm typically uses 'username') #}
+            <div class="relative">
+                <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.username.label }}
+                </label>
+                <input type="text"
+                       name="{{ form.username.name }}"
+                       id="{{ form.username.id_for_label }}"
+                       value="{{ form.username.value|default_if_none:'' }}"
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm
+                              {% if form.username.errors %}border-red-500{% endif %}"
+                       placeholder="Enter your email or username">
+                {% if form.username.help_text %}
+                    <p class="mt-2 text-sm text-gray-500">{{ form.username.help_text }}</p>
+                {% endif %}
+                {% if form.username.errors %}
+                    <ul class="text-sm text-red-600 mt-2 list-none p-0">
+                        {% for error in form.username.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
+            {# Password Field #}
+            <div class="relative">
+                <label for="{{ form.password.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.password.label }}
+                </label>
+                <input type="password"
+                       name="{{ form.password.name }}"
+                       id="{{ form.password.id_for_label }}"
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm
+                              {% if form.password.errors %}border-red-500{% endif %}"
+                       placeholder="Enter your password">
+                {% if form.password.help_text %}
+                    <p class="mt-2 text-sm text-gray-500">{{ form.password.help_text }}</p>
+                {% endif %}
+                {% if form.password.errors %}
+                    <ul class="text-sm text-red-600 mt-2 list-none p-0">
+                        {% for error in form.password.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
+            <button type="submit"
+                    class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                Log in
+            </button>
+        </form>
+        {# Proper Login Form Ends Here #}
+
+        <p class="mt-6 text-center text-sm text-gray-600">
+            Don't have an account? <a href="{% url 'register' %}" class="font-medium text-indigo-600 hover:text-indigo-500">Register now</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
