@@ -75,29 +75,31 @@ class Organisers(AbstractBaseUser, PermissionsMixin):
 
 
 class Stories(models.Model):
-    # Foreign Key to Organisers
-    organiser = models.ForeignKey(
-        'Organisers', # Refers to the Organisers model
-        on_delete=models.CASCADE, # If an organiser is deleted, their stories are also deleted
-        related_name='stories' # Allows reverse access from Organiser object: organiser.stories.all()
+    organiser = models.ForeignKey(Organisers, on_delete=models.CASCADE, related_name='stories')
+    title = models.CharField(max_length=255)
+    main_message = models.TextField()
+    reveal_date = models.DateField()
+    qr_code_url = models.URLField(max_length=500, blank=True, null=True) # URL for the QR code
+    topper_identifier = models.CharField(
+        max_length=100, 
+        unique=True, 
+        blank=False, 
+        null=False,  
+        help_text="Unique code printed on the physical cake topper's QR code."
     )
-
-    # Core Story Information
-    title = models.CharField(max_length=255, null=False)
-    main_message = models.TextField(null=False)
-    qr_code_url = models.TextField(unique=True, null=False) # URL to the QR code image in S3
-    reveal_date = models.DateField(null=False) # The date the story becomes accessible
-
-    # Timestamps for auditing
+    # NEW FIELD: Max number of senders allowed for this story
+    max_senders = models.PositiveIntegerField(
+        default=6, # A reasonable default, adjust as needed
+        help_text="Maximum number of senders allowed to contribute to this story."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # This method is used to define a human-readable representation of the object.
+    class Meta:
+        verbose_name_plural = "Stories" # Correct pluralization for admin
+
     def __str__(self):
         return self.title
-
-    class Meta:
-        verbose_name_plural = "Stories" # Fixes pluralization in Django admin
 
 
 
@@ -164,40 +166,40 @@ class StorySenders(models.Model):
 
 
 
+# Text Contribution Model
 class TextContribution(models.Model):
     story_sender = models.ForeignKey(StorySenders, on_delete=models.CASCADE, related_name='text_contributions')
     content = models.TextField()
+    is_approved = models.BooleanField(default=False) # NEW: Field for approval status
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Text from {self.story_sender.sender.email} to {self.story_sender.story.title}"
+        return f"Text from {self.story_sender.sender.email} to {self.story_sender.story.title} (Approved: {self.is_approved})"
 
-# NEW: Image Contribution Model
+# Image Contribution Model
 class ImageContribution(models.Model):
     story_sender = models.ForeignKey(StorySenders, on_delete=models.CASCADE, related_name='image_contributions')
-    # The 'upload_to' argument specifies a subdirectory within MEDIA_ROOT
     image = models.ImageField(upload_to='contributions/images/') 
     caption = models.CharField(max_length=255, blank=True, null=True)
+    is_approved = models.BooleanField(default=False) # NEW: Field for approval status
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Image from {self.story_sender.sender.email} to {self.story_sender.story.title}"
+        return f"Image from {self.story_sender.sender.email} to {self.story_sender.story.title} (Approved: {self.is_approved})"
 
-
+# Video Contribution Model
 class VideoContribution(models.Model):
     story_sender = models.ForeignKey(StorySenders, on_delete=models.CASCADE, related_name='video_contributions')
-    # Make video file optional
     video = models.FileField(upload_to='contributions/videos/', blank=True, null=True) 
-    # New field for YouTube URL
     youtube_url = models.URLField(max_length=200, blank=True, null=True)
-    # New field to store the extracted YouTube video ID for embedding
     youtube_video_id = models.CharField(max_length=50, blank=True, null=True) 
     caption = models.CharField(max_length=255, blank=True, null=True)
+    is_approved = models.BooleanField(default=False) # NEW: Field for approval status
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         if self.youtube_url:
-            return f"YouTube Video from {self.story_sender.sender.email} to {self.story_sender.story.title}"
+            return f"YouTube Video from {self.story_sender.sender.email} to {self.story_sender.story.title} (Approved: {self.is_approved})"
         elif self.video:
-            return f"Uploaded Video from {self.story_sender.sender.email} to {self.story_sender.story.title}"
-        return f"Video Contribution from {self.story_sender.sender.email} to {self.story_sender.story.title}"
+            return f"Uploaded Video from {self.story_sender.sender.email} to {self.story_sender.story.title} (Approved: {self.is_approved})"
+        return f"Video Contribution from {self.story_sender.sender.email} to {self.story_sender.story.title} (Approved: {self.is_approved})"

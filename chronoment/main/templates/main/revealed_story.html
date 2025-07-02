@@ -1,0 +1,114 @@
+{# your_app_name/templates/your_app_name/revealed_story.html #}
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="p-4 w-full max-w-4xl mx-auto">
+    <div class="bg-white p-8 rounded-xl shadow-lg">
+        <h1 class="text-4xl font-extrabold text-center text-gray-900 leading-tight mb-4">
+            The Story of <span class="text-indigo-600">'{{ story.title }}'</span> is Revealed!
+        </h1>
+        <p class="text-center text-lg text-gray-700 mb-8">
+            A collection of memories shared by those who care.
+        </p>
+
+        {# Main Message #}
+        <div class="mb-8 border-b pb-4 border-gray-200">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-3">Main Message from Organiser</h3>
+            <p class="text-gray-700 text-lg leading-relaxed">{{ story.main_message }}</p>
+        </div>
+
+        {# Display all contributions #}
+        <div class="space-y-10"> {# Add space between different contribution sections #}
+            {# Text Contributions #}
+            {% if text_contributions %}
+                <div class="bg-gray-50 p-6 rounded-lg shadow-sm">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Messages from Contributors</h3>
+                    <ul class="space-y-4">
+                        {% for contribution in text_contributions %}
+                            <li class="bg-white p-4 rounded-md shadow-sm border border-gray-200">
+                                <p class="text-gray-800 text-base leading-relaxed mb-2">{{ contribution.content }}</p>
+                                <p class="text-sm text-gray-600 font-medium">
+                                    - {{ contribution.story_sender.sender.name|default:contribution.story_sender.sender.email }}
+                                    <span class="text-xs text-gray-500 ml-2">{{ contribution.created_at|date:"F j, Y, H:i" }}</span>
+                                </p>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            {# Image Contributions #}
+            {% if image_contributions %}
+                <div class="bg-gray-50 p-6 rounded-lg shadow-sm">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Photos from Contributors</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {% for contribution in image_contributions %}
+                            <div class="bg-white rounded-lg overflow-hidden shadow-md border border-gray-200">
+                                <img src="{{ contribution.image.url }}" alt="{{ contribution.caption|default:'Contributed image' }}" class="w-full h-48 object-cover object-center">
+                                <div class="p-4">
+                                    {% if contribution.caption %}<p class="text-gray-800 font-medium mb-1">{{ contribution.caption }}</p>{% endif %}
+                                    <p class="text-sm text-gray-600">
+                                        By {{ contribution.story_sender.sender.name|default:contribution.story_sender.sender.email }}
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-1">{{ contribution.created_at|date:"F j, Y, H:i" }}</p>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {# Video Contributions #}
+            {% if video_contributions %}
+                <div class="bg-gray-50 p-6 rounded-lg shadow-sm">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Videos from Contributors</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {% for contribution in video_contributions %}
+                            <div class="bg-white rounded-lg overflow-hidden shadow-md border border-gray-200">
+                                {% if contribution.youtube_video_id %}
+                                    {# Embed YouTube video using iframe #}
+                                    <div class="relative w-full" style="padding-bottom: 56.25%; height: 0; overflow: hidden;">
+                                        <iframe class="absolute top-0 left-0 w-full h-full" 
+                                                src="https://www.youtube.com/embed/{{ contribution.youtube_video_id }}?rel=0" 
+                                                frameborder="0" 
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                                allowfullscreen>
+                                        </iframe>
+                                    </div>
+                                {% elif contribution.video %}
+                                    {# Display uploaded video file #}
+                                    <video controls class="w-full h-64 object-cover object-center">
+                                        <source src="{{ contribution.video.url }}" type="video/mp4"> {# Assuming MP4, adjust type if needed #}
+                                        Your browser does not support the video tag.
+                                    </video>
+                                {% else %}
+                                    <div class="p-4 text-gray-600 text-center">No video content found for this entry.</div>
+                                {% endif %}
+                                <div class="p-4">
+                                    {% if contribution.caption %}<p class="text-gray-800 font-medium mb-1">{{ contribution.caption }}</p>{% endif %}
+                                    <p class="text-sm text-gray-600">
+                                        By {{ contribution.story_sender.sender.name|default:contribution.story_sender.sender.email }}
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-1">{{ contribution.created_at|date:"F j, Y, H:i" }}</p>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if not text_contributions and not image_contributions and not video_contributions %}
+                <div class="text-center py-8 bg-gray-50 rounded-lg shadow-sm">
+                    <p class="text-gray-600 text-lg">No contributions have been added to this story yet.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="text-center mt-10 pt-6 border-t border-gray-200">
+            <a href="{% url 'home' %}" class="font-medium text-indigo-600 hover:text-indigo-500">Back to Dashboard</a>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

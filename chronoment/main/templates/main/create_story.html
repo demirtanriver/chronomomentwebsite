@@ -1,61 +1,88 @@
 {# your_app_name/templates/your_app_name/create_story.html #}
-{% extends 'main/base.html' %} {# Extend your base layout #}
-{% load static %} {# If you use static files #}
+{% extends 'main/base.html' %}
+{% load static %}
 
 {% block content %}
-{# Removed: <body> tag and its styling, as base.html handles the body and its background #}
-{# Removed: <div class="min-h-screen flex items-center justify-center bg-gray-100 p-4 sm:p-6 lg:p-8"> #}
-    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md"> {# This div is now directly centered by base.html's .main #}
-        <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">Create New Story</h2>
+<div class="container mx-auto px-4 py-8">
+    <div class="bg-white p-8 rounded-xl shadow-lg max-w-xl mx-auto">
+        <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">Create a New Story</h2>
+        <p class="text-center text-gray-600 mb-6">Fill in the details below to start collecting memories for your event.</p>
 
-        {# Display non-field errors at the top if any #}
-        {% if form.non_field_errors %}
-            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-6" role="alert">
-                <strong class="font-bold">Error:</strong>
-                <span class="block sm:inline">Please correct the following issues.</span>
-                <ul class="list-disc pl-5 mt-2">
-                    {% for error in form.non_field_errors %}
-                        <li>{{ error }}</li>
-                    {% endfor %}
-                </ul>
+        {# Display Django messages #}
+        {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                    <div class="px-4 py-3 rounded-md relative mb-2
+                        {% if message.tags == 'success' %}bg-green-100 border border-green-400 text-green-700{% endif %}
+                        {% if message.tags == 'error' %}bg-red-100 border border-red-400 text-red-700{% endif %}
+                        {% if message.tags == 'info' %}bg-blue-100 border border-blue-400 text-blue-700{% endif %}
+                        {% if message.tags == 'warning' %}bg-yellow-100 border border-yellow-400 text-yellow-700{% endif %}">
+                        <span class="block sm:inline">{{ message }}</span>
+                    </div>
+                {% endfor %}
             </div>
         {% endif %}
 
-        <form method="post" action="{% url 'create_story' %}" class="space-y-6">
+        <form method="post" class="space-y-6">
             {% csrf_token %}
 
-            {# Hidden fields, if any (like the CSRF token) #}
-            <!-- {{ form.hidden_fields }} -->
+            {# Title Field #}
+            <div>
+                <label for="{{ form.title.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.title.label }}<span class="text-red-500">*</span>
+                </label>
+                {{ form.title }}
+                {% for error in form.title.errors %}<p class="text-sm text-red-600 mt-1">{{ error }}</p>{% endfor %}
+            </div>
 
-            {# Loop through all visible fields and apply consistent styling #}
-            {% for field in form %}
-                <div class="relative">
-                    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                        {{ field.label }}
-                    </label>
-                    
-                    {# Render the field's widget (input, textarea, select) #}
-                    {# Django's ModelForm widgets already have classes applied from forms.py #}
-                    {{ field }}
+            {# Main Message Field #}
+            <div>
+                <label for="{{ form.main_message.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.main_message.label }}<span class="text-red-500">*</span>
+                </label>
+                {{ form.main_message }}
+                {% for error in form.main_message.errors %}<p class="text-sm text-red-600 mt-1">{{ error }}</p>{% endfor %}
+            </div>
 
-                    {% if field.help_text %}
-                        <p class="mt-2 text-sm text-gray-500">{{ field.help_text }}</p>
-                    {% endif %}
+            {# Reveal Date Field #}
+            <div>
+                <label for="{{ form.reveal_date.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.reveal_date.label }}<span class="text-red-500">*</span>
+                </label>
+                {{ form.reveal_date }}
+                <p class="mt-2 text-sm text-gray-500">{{ form.reveal_date.help_text }}</p>
+                {% for error in form.reveal_date.errors %}<p class="text-sm text-red-600 mt-1">{{ error }}</p>{% endfor %}
+            </div>
 
-                    {% if field.errors %}
-                        <ul class="text-sm text-red-600 mt-2 list-none p-0">
-                            {% for error in field.errors %}
-                                <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
+            {# NEW: Topper Identifier Field #}
+            <div>
+                <label for="{{ form.topper_identifier.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.topper_identifier.label }}<span class="text-red-500">*</span>
+                </label>
+                {{ form.topper_identifier }}
+                <p class="mt-2 text-sm text-gray-500">{{ form.topper_identifier.help_text }}</p>
+                {% for error in form.topper_identifier.errors %}<p class="text-sm text-red-600 mt-1">{{ error }}</p>{% endfor %}
+            </div>
+
+            {# Non-field errors #}
+            {% if form.non_field_errors %}
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative">
+                    <ul class="list-disc pl-5">
+                        {% for error in form.non_field_errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
                 </div>
-            {% endfor %}
+            {% endif %}
 
-            <button type="submit"
-                    class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
                 Create Story
             </button>
         </form>
+
+        <div class="text-center mt-8 pt-6 border-t border-gray-200">
+            <a href="{% url 'my_stories' %}" class="font-medium text-indigo-600 hover:text-indigo-500">Back to My Stories</a>
+        </div>
     </div>
+</div>
 {% endblock %}

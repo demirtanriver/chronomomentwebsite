@@ -1,6 +1,9 @@
 from django import forms
 from .models import Organisers, Stories, Senders, StorySenders, TextContribution, ImageContribution, VideoContribution # Import new models
 import re
+from django.forms import formset_factory
+from django.contrib.auth.hashers import make_password # For hashing passwords
+from django.utils import timezone
 
 class CreateNewForm(forms.Form):
     first_name = forms.CharField(label="First Name",max_length=100)
@@ -38,7 +41,7 @@ class StoryForm(forms.ModelForm):
 
 
 
-from django.contrib.auth.hashers import make_password # For hashing passwords
+
 
 
 class OrganiserForm(forms.ModelForm):
@@ -127,11 +130,9 @@ class OrganiserForm(forms.ModelForm):
         return organiser
     
 
-# You might have other forms here, like OrganiserForm, keep them.
-from django.utils import timezone
+
 # Story Creation Form
 class StoryForm(forms.ModelForm):
-    # Use DateInput with type="date" for native date picker
     reveal_date = forms.DateField(
         widget=forms.DateInput(attrs={
             'type': 'date',
@@ -142,7 +143,8 @@ class StoryForm(forms.ModelForm):
     
     class Meta:
         model = Stories
-        fields = ['title', 'main_message', 'reveal_date']
+        # CRITICAL CHANGE: Removed 'max_senders' from fields
+        fields = ['title', 'main_message', 'reveal_date', 'topper_identifier'] 
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
@@ -152,15 +154,39 @@ class StoryForm(forms.ModelForm):
                 'class': 'mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm h-32',
                 'placeholder': 'Write a heartfelt message that will be revealed with the story.'
             }),
+            'topper_identifier': forms.TextInput(attrs={
+                'class': 'mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
+                'placeholder': 'e.g., BIRTHDAY2024'
+            }),
+        }
+        labels = {
+            'title': 'Story Title',
+            'main_message': 'Main Message',
+            'reveal_date': 'Reveal Date',
+            'topper_identifier': 'Topper Identifier',
+        }
+        help_texts = {
+            'reveal_date': 'The date when this story will become accessible to those who scan the QR code.',
+            'topper_identifier': 'A unique code for the physical cake topper. E.g., "BIRTHDAY2024".',
         }
 
-    # Custom validation for reveal_date
     def clean_reveal_date(self):
         reveal_date = self.cleaned_data['reveal_date']
         if reveal_date < timezone.now().date():
             raise forms.ValidationError("Reveal date cannot be in the past.")
         return reveal_date
-from django.forms import formset_factory
+
+    def clean_topper_identifier(self):
+        topper_identifier = self.cleaned_data['topper_identifier']
+        if Stories.objects.filter(topper_identifier=topper_identifier).exists():
+            if self.instance and self.instance.topper_identifier == topper_identifier:
+                pass 
+            else:
+                raise forms.ValidationError("This topper identifier is already in use. Please choose a unique one.")
+        return topper_identifier
+
+
+
 # Form for a single Sender's details (NEW)
 class SenderForm(forms.Form):
     email = forms.EmailField(

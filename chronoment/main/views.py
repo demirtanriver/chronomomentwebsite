@@ -1,8 +1,9 @@
+from django.forms import formset_factory
 from django.shortcuts import render
 from django.http import HttpResponse,HttpResponseRedirect
 from .forms import CreateNewForm,OrganiserForm
 from .forms import (
-    OrganiserForm, StoryForm, SenderFormSet,
+    OrganiserForm, StoryForm, SenderForm,
     TextContributionForm, ImageContributionForm, VideoContributionForm # NEW IMPORTS
 )
 # Import all models
@@ -10,6 +11,27 @@ from .models import (
     Organisers, Stories, Senders, StorySenders,
     TextContribution, ImageContribution, VideoContribution # NEW IMPORTS
 )
+from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
+from django.contrib import messages # For displaying success/error messages
+from django.contrib.auth.decorators import login_required # To ensure only logged-in users can create stories
+import uuid # Used for generating a unique part of the QR code URL
+
+# Make sure to import your StoryForm and Stories model
+from .forms import StoryForm 
+from .models import Stories, Organisers
+
+from django.shortcuts import render, redirect
+from django.urls import reverse
+from django.contrib import messages
+from django.contrib.auth import authenticate, login as auth_login 
+from django.contrib.auth.forms import AuthenticationForm
+
+from django.shortcuts import render, redirect
+from django.urls import reverse
+from django.contrib import messages
+from django.contrib.auth import authenticate, login as auth_login # Renamed login to avoid conflict
+from django.contrib.auth.forms import AuthenticationForm # This form provides 'username' and 'password' fields
 # Create your views here.
 
 def index(response,id):
@@ -22,6 +44,40 @@ def home(response):
 def user(response,id):
     us = Organisers.objects.get(id=id)
     return render(response, "main/user.html",{"us":us})
+
+
+def _check_and_update_story_sender_status(story_sender):
+    """
+    Checks if all contributions for a given StorySender are approved.
+    If so, updates the StorySender's invitation_status to 'accepted'.
+    """
+    # Get all contributions associated with this StorySender
+    all_text_contributions = TextContribution.objects.filter(story_sender=story_sender)
+    all_image_contributions = ImageContribution.objects.filter(story_sender=story_sender)
+    all_video_contributions = VideoContribution.objects.filter(story_sender=story_sender)
+
+    # Combine all contributions into a single list (or just check counts)
+    all_contributions = list(all_text_contributions) + list(all_image_contributions) + list(all_video_contributions)
+
+    # If there are no contributions, the status should not become 'accepted'
+    if not all_contributions:
+        return
+
+    # Check if ALL contributions are approved
+    all_approved = all(c.is_approved for c in all_contributions)
+
+    if all_approved and story_sender.invitation_status != 'accepted':
+        story_sender.invitation_status = 'accepted'
+        story_sender.save()
+        messages.info(None, f"All contributions from {story_sender.sender.name or story_sender.sender.email} for '{story_sender.story.title}' have been approved. Status updated to 'Accepted'.")
+    elif not all_approved and story_sender.invitation_status == 'accepted':
+        # This case handles if a previously approved contribution is somehow unapproved
+        # or if a new unapproved contribution is added after all others were approved.
+        # Revert status back to 'contributed' if not all are approved anymore.
+        story_sender.invitation_status = 'contributed'
+        story_sender.save()
+        messages.info(None, f"Not all contributions from {story_sender.sender.name or story_sender.sender.email} for '{story_sender.story.title}' are approved. Status reverted to 'Contributed'.")
+
 
 def signup(response):
     if response.method == "POST":
@@ -55,19 +111,6 @@ def register(response):
     else:
         form = OrganiserForm()
     return render(response, "main/register.html", {"form":form})
-
-
-from django.shortcuts import render, redirect
-from django.urls import reverse
-from django.contrib import messages
-from django.contrib.auth import authenticate, login as auth_login 
-from django.contrib.auth.forms import AuthenticationForm
-
-from django.shortcuts import render, redirect
-from django.urls import reverse
-from django.contrib import messages
-from django.contrib.auth import authenticate, login as auth_login # Renamed login to avoid conflict
-from django.contrib.auth.forms import AuthenticationForm # This form provides 'username' and 'password' fields
 
 
 def login(request):
@@ -104,71 +147,41 @@ def login(request):
 
 
 
-from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse
-from django.contrib import messages # For displaying success/error messages
-from django.contrib.auth.decorators import login_required # To ensure only logged-in users can create stories
-import uuid # Used for generating a unique part of the QR code URL
-
-# Make sure to import your StoryForm and Stories model
-from .forms import StoryForm 
-from .models import Stories, Organisers
-
-@login_required # This decorator ensures that only authenticated users can access this view.
-                # If a non-logged-in user tries to access it, they will be redirected to LOGIN_URL.
+@login_required
 def create_story(request):
-    """
-    Handles the creation of a new Story by a logged-in Organiser.
-    """
-    # The request.user object will be an instance of your Organisers model
-    # because you have set AUTH_USER_MODEL = 'your_app_name.Organisers' in settings.py.
     current_organiser = request.user 
 
     if request.method == 'POST':
-        # If the request is POST, it means the form has been submitted.
-        # Populate the form with the submitted data.
-        form = StoryForm(request.POST) 
+        form = StoryForm(request.POST)
         if form.is_valid():
-            # If the form data is valid:
-            # 1. Create a Story instance but don't save it to the database yet (commit=False).
-            #    This allows us to set the 'organiser' field before saving.
             story = form.save(commit=False)
-            
-            # 2. Assign the currently logged-in organiser to this story.
             story.organiser = current_organiser
             
-            # 3. Generate a unique URL for the QR code.
-            #    In a real application, this URL would point to an actual QR code image
-            #    stored in AWS S3, or a dynamic endpoint that generates the QR code.
-            #    For now, it's a placeholder.
-            story.qr_code_url = f"https://yourdomain.com/story/qr/{uuid.uuid4()}/"
-            
-            # 4. Save the Story instance to the database.
-            story.save()
-            
-            # 5. Display a success message to the user.
-            messages.success(request, f"Story '{story.title}' created successfully! You can now invite senders.")
-            
-            # 6. Redirect the user to a new page, e.g., the story detail page.
-            #    'story_detail' is the name of the URL pattern for viewing a single story.
-            #    'args=[story.id]' passes the newly created story's ID to the URL.
+            topper_identifier = form.cleaned_data.get('topper_identifier')
+            if topper_identifier:
+                story.qr_code_url = request.build_absolute_uri(
+                    reverse('view_story_by_topper', args=[topper_identifier])
+                )
+            else:
+                story.qr_code_url = None 
+
+            # The max_senders field is now part of the form's cleaned_data
+            # It will be saved automatically by form.save() because it's a model field.
+            # No explicit line like story.max_senders = form.cleaned_data['max_senders'] is needed
+            # as long as 'max_senders' is in StoryForm's Meta.fields.
+
+            story.save() # Save the story instance, including max_senders
+            messages.success(request, f"Story '{story.title}' created successfully!")
             return redirect(reverse('story_detail', args=[story.id]))
         else:
-            # If the form data is NOT valid:
-            # Display an error message. The template will automatically show field-specific errors.
             messages.error(request, "Please correct the errors below to create your story.")
-            # The form with errors will be passed to the template for re-rendering.
     else:
-        # If the request is GET, it means the user is just visiting the page for the first time.
-        # Create an empty form instance to display.
         form = StoryForm()
 
-    # Prepare the context dictionary to pass data to the template.
     context = {
         'form': form,
         'page_title': 'Create New Story'
     }
-    # Render the HTML template, passing the form and page title.
     return render(request, 'main/create_story.html', context)
 
 # Placeholder for Story Detail View (you'll need to implement this fully later)
@@ -236,12 +249,28 @@ def manage_senders_for_story(request, story_id):
     
     # Fetch existing StorySenders for this story
     existing_story_senders = StorySenders.objects.filter(story=story).order_by('sender__email')
+    existing_senders_count = existing_story_senders.count()
+
+    # Calculate remaining slots
+    remaining_slots = max(0, story.max_senders - existing_senders_count)
+    
+    # Determine how many extra forms to display initially
+    # We want to show a few (e.g., 3) empty forms, but not more than remaining_slots
+    initial_extra_forms = min(3, remaining_slots) 
+
+    # Dynamically create the SenderFormSet
+    DynamicSenderFormSet = formset_factory(
+        SenderForm, 
+        extra=initial_extra_forms, 
+        max_num=remaining_slots, # Set max_num to the actual remaining slots
+        validate_max=True
+    )
 
     if request.method == 'POST':
         action = request.POST.get('action')
 
         if action == 'add_new_senders':
-            formset = SenderFormSet(request.POST, prefix='senders')
+            formset = DynamicSenderFormSet(request.POST, prefix='senders')
             if formset.is_valid():
                 senders_added_count = 0
                 for form in formset:
@@ -249,9 +278,15 @@ def manage_senders_for_story(request, story_id):
                         email = form.cleaned_data['email']
                         name = form.cleaned_data.get('name', '')
 
+                        # Server-side check for max_senders limit before adding
+                        if existing_senders_count + senders_added_count >= story.max_senders:
+                            messages.error(request, f"Cannot add more senders. Maximum limit of {story.max_senders} reached for this story.")
+                            # Break the loop and redirect, or continue to show errors for forms that would exceed limit
+                            break # Exit loop if limit reached
+
                         sender, created = Senders.objects.get_or_create(
                             email=email,
-                            defaults={'name': name}
+                            defaults={'name': name} # Set name only if creating new sender
                         )
                         if not created and name and sender.name != name:
                             sender.name = name
@@ -328,33 +363,20 @@ def manage_senders_for_story(request, story_id):
                 except Exception as e:
                     messages.error(request, f"Error resending invitation: {e}")
             return redirect(reverse('manage_senders_for_story', args=[story.id]))
-        
-        # Add 'edit_sender' action if simple inline editing is desired later
-        # elif action == 'edit_sender':
-        #     story_sender_id = request.POST.get('story_sender_id')
-        #     new_name = request.POST.get('new_name') # Or new_email, but email changes are complex
-        #     if story_sender_id and new_name is not None:
-        #         try:
-        #             story_sender = get_object_or_404(StorySenders, id=story_sender_id, story=story)
-        #             sender = story_sender.sender
-        #             sender.name = new_name
-        #             sender.save()
-        #             messages.success(request, f"Sender name updated to '{new_name}'.")
-        #         except Exception as e:
-        #             messages.error(request, f"Error updating sender name: {e}")
-        #     return redirect(reverse('manage_senders_for_story', args=[story.id]))
 
 
     else: # GET request
-        formset = SenderFormSet(prefix='senders')
+        formset = DynamicSenderFormSet(prefix='senders')
 
     context = {
         'story': story,
         'formset': formset, # For adding new senders
         'existing_story_senders': existing_story_senders, # For displaying existing senders
+        'remaining_slots': remaining_slots, # Pass remaining slots to the template
         'page_title': f"Manage Senders for '{story.title}'"
     }
     return render(request, 'main/manage_senders_for_story.html', context)
+
 
 
 @login_required
@@ -368,7 +390,7 @@ def select_story_for_senders(request):
     # Filter for stories where the reveal_date is greater than today's date
     organiser_stories = Stories.objects.filter(
         organiser=request.user,
-        reveal_date__gt=timezone.now().date() # Filter for future reveal dates
+        reveal_date__gte=timezone.now().date() # Filter for future reveal dates
     ).order_by('-created_at') # Order by creation date, newest first
 
     context = {
@@ -480,6 +502,279 @@ def join_story_by_token(request, token):
         'page_title': f"Contribute to '{story.title}'"
     }
     return render(request, 'main/join_story_by_token.html', context)
+
+
+
+def view_revealed_story(request, story_id):
+    story = get_object_or_404(Stories, id=story_id) # No organiser check here yet, for future receiver access
+
+    # Check if the story has been revealed
+    if story.reveal_date > timezone.now().date():
+        messages.warning(request, "This story has not been revealed yet. Please check back on the reveal date.")
+        # If the user is an organiser, redirect them to their story detail page
+        if request.user.is_authenticated and request.user == story.organiser:
+            return redirect(reverse('story_detail', args=[story.id]))
+        # Otherwise, redirect to home or a generic "not yet revealed" page
+        return redirect(reverse('home')) # Or a specific 'not_revealed' page
+
+    # If revealed, fetch all contributions related to this story
+    story_senders_for_story = StorySenders.objects.filter(story=story)
+
+    text_contributions = TextContribution.objects.filter(
+        story_sender__in=story_senders_for_story
+    ).order_by('created_at')
+
+    image_contributions = ImageContribution.objects.filter(
+        story_sender__in=story_senders_for_story
+    ).order_by('created_at')
+
+    video_contributions = VideoContribution.objects.filter(
+        story_sender__in=story_senders_for_story
+    ).order_by('created_at')
+    
+    context = {
+        'story': story,
+        'text_contributions': text_contributions,
+        'image_contributions': image_contributions,
+        'video_contributions': video_contributions,
+        'page_title': f"Revealed Story: {story.title}"
+    }
+    return render(request, 'main/revealed_story.html', context)
+
+
+
+@login_required
+def story_detail(request, story_id):
+    story = get_object_or_404(Stories, id=story_id, organiser=request.user)
+
+    # Determine if the story has been revealed
+    is_revealed = story.reveal_date <= timezone.now().date()
+
+    context = {
+        'story': story,
+        'is_revealed': is_revealed, # Pass this flag to the template
+        'page_title': f"Story: {story.title}"
+    }
+    return render(request, 'main/story_detail.html', context)
+
+
+
+@login_required
+def my_stories(request):
+    # Fetch all stories created by the currently logged-in organiser
+    # Order them by creation date, newest first
+    organiser_stories = Stories.objects.filter(organiser=request.user).order_by('-created_at')
+
+    context = {
+        'stories': organiser_stories,
+        'page_title': 'My Stories',
+        'today': timezone.now().date(), # Pass today's date as a date object
+    }
+    return render(request, 'main/my_stories.html', context)
+
+
+def view_story_by_topper(request, topper_identifier):
+    # Try to find the story by the unique topper_identifier
+    try:
+        story = Stories.objects.get(topper_identifier=topper_identifier)
+    except Stories.DoesNotExist:
+        messages.error(request, "No story found for this topper code.")
+        return redirect(reverse('home')) # Or a specific 'topper_not_found' page
+
+    # Check if the story has been revealed
+    if story.reveal_date > timezone.now().date():
+        messages.warning(request, "This story has not been revealed yet. Please check back on the reveal date.")
+        # If the user is an organiser and logged in, redirect them to their story detail page
+        if request.user.is_authenticated and request.user == story.organiser:
+            return redirect(reverse('story_detail', args=[story.id]))
+        # Otherwise, redirect to home or a generic "not yet revealed" page
+        return redirect(reverse('home')) # Or a specific 'not_revealed' page
+
+    # If revealed, fetch all contributions related to this story
+    story_senders_for_story = StorySenders.objects.filter(story=story)
+
+    text_contributions = TextContribution.objects.filter(
+        story_sender__in=story_senders_for_story
+    ).order_by('created_at')
+
+    image_contributions = ImageContribution.objects.filter(
+        story_sender__in=story_senders_for_story
+    ).order_by('created_at')
+
+    video_contributions = VideoContribution.objects.filter(
+        story_sender__in=story_senders_for_story
+    ).order_by('created_at')
+    
+    context = {
+        'story': story,
+        'text_contributions': text_contributions,
+        'image_contributions': image_contributions,
+        'video_contributions': video_contributions,
+        'page_title': f"Revealed Story: {story.title}"
+    }
+    return render(request, 'main/revealed_story.html', context)
+
+# Original view_revealed_story (now potentially redundant if view_story_by_topper is the primary public view)
+# You can remove this or keep it if you foresee another use case for direct story_id access
+# without a topper identifier. For now, view_story_by_topper covers the public viewing.
+# If you keep it, ensure it's named differently than 'view_revealed_story_public' in urls.py
+# and update any internal links that might still point to it.
+# For simplicity, I'm assuming view_story_by_topper will be the only public access.
+# If you need this specific view with story_id directly, we can re-add it with a different URL name.
+# For now, I'm leaving it as is, but its URL name was removed from urls.py.
+def view_revealed_story(request, story_id):
+    story = get_object_or_404(Stories, id=story_id) # No organiser check here yet, for future receiver access
+
+    # Check if the story has been revealed
+    if story.reveal_date > timezone.now().date():
+        messages.warning(request, "This story has not been revealed yet. Please check back on the reveal date.")
+        # If the user is an organiser, redirect them to their story detail page
+        if request.user.is_authenticated and request.user == story.organiser:
+            return redirect(reverse('story_detail', args=[story.id]))
+        # Otherwise, redirect to home or a generic "not yet revealed" page
+        return redirect(reverse('home')) # Or a specific 'not_revealed' page
+
+    # If revealed, fetch all contributions related to this story
+    story_senders_for_story = StorySenders.objects.filter(story=story)
+
+    text_contributions = TextContribution.objects.filter(
+        story_sender__in=story_senders_for_story
+    ).order_by('created_at') # Order by creation date for chronological display
+
+    image_contributions = ImageContribution.objects.filter(
+        story_sender__in=story_senders_for_story
+    ).order_by('created_at')
+
+    video_contributions = VideoContribution.objects.filter(
+        story_sender__in=story_senders_for_story
+    ).order_by('created_at')
+    
+    context = {
+        'story': story,
+        'text_contributions': text_contributions,
+        'image_contributions': image_contributions,
+        'video_contributions': video_contributions,
+        'page_title': f"Revealed Story: {story.title}"
+    }
+    return render(request, 'main/revealed_story.html', context)
+
+
+@login_required
+def view_sender_contributions(request, story_id, story_sender_id):
+    # Ensure the story belongs to the current organiser
+    story = get_object_or_404(Stories, id=story_id, organiser=request.user)
+    
+    # Ensure the story_sender is linked to this story
+    story_sender = get_object_or_404(StorySenders, id=story_sender_id, story=story)
+
+    # Fetch all contributions for this specific StorySender
+    text_contributions = TextContribution.objects.filter(
+        story_sender=story_sender
+    ).order_by('created_at')
+
+    image_contributions = ImageContribution.objects.filter(
+        story_sender=story_sender
+    ).order_by('created_at')
+
+    video_contributions = VideoContribution.objects.filter(
+        story_sender=story_sender
+    ).order_by('created_at')
+
+    context = {
+        'story': story,
+        'story_sender': story_sender,
+        'sender_name': story_sender.sender.name if story_sender.sender.name else story_sender.sender.email,
+        'text_contributions': text_contributions,
+        'image_contributions': image_contributions,
+        'video_contributions': video_contributions,
+        'page_title': f"Contributions by {story_sender.sender.name or story_sender.sender.email} for '{story.title}'"
+    }
+    return render(request, 'main/sender_contributions.html', context)
+
+
+# NEW: View to handle approval of a text contribution
+@login_required
+def approve_text_contribution(request, pk):
+    if request.method == 'POST':
+        contribution = get_object_or_404(TextContribution, pk=pk)
+        if request.user == contribution.story_sender.story.organiser:
+            contribution.is_approved = True
+            contribution.save()
+            messages.success(request, "Text contribution approved successfully.")
+            _check_and_update_story_sender_status(contribution.story_sender) # Call helper
+        else:
+            messages.error(request, "You are not authorized to approve this contribution.")
+    return redirect(request.META.get('HTTP_REFERER', reverse('home')))
+
+# NEW: View to handle approval of an image contribution
+@login_required
+def approve_image_contribution(request, pk):
+    if request.method == 'POST':
+        contribution = get_object_or_404(ImageContribution, pk=pk)
+        if request.user == contribution.story_sender.story.organiser:
+            contribution.is_approved = True
+            contribution.save()
+            messages.success(request, "Image contribution approved successfully.")
+            _check_and_update_story_sender_status(contribution.story_sender) # Call helper
+        else:
+            messages.error(request, "You are not authorized to approve this contribution.")
+    return redirect(request.META.get('HTTP_REFERER', reverse('home')))
+
+# NEW: View to handle approval of a video contribution
+@login_required
+def approve_video_contribution(request, pk):
+    if request.method == 'POST':
+        contribution = get_object_or_404(VideoContribution, pk=pk)
+        if request.user == contribution.story_sender.story.organiser:
+            contribution.is_approved = True
+            contribution.save()
+            messages.success(request, "Video contribution approved successfully.")
+            _check_and_update_story_sender_status(contribution.story_sender) # Call helper
+        else:
+            messages.error(request, "You are not authorized to approve this contribution.")
+    return redirect(request.META.get('HTTP_REFERER', reverse('home')))
+
+# NEW: View to handle deletion of a text contribution
+@login_required
+def delete_text_contribution(request, pk):
+    if request.method == 'POST':
+        contribution = get_object_or_404(TextContribution, pk=pk)
+        story_sender = contribution.story_sender # Get story_sender before deleting contribution
+        if request.user == story_sender.story.organiser:
+            contribution.delete()
+            messages.success(request, "Text contribution deleted successfully.")
+            _check_and_update_story_sender_status(story_sender) # Call helper after deletion
+        else:
+            messages.error(request, "You are not authorized to delete this contribution.")
+    return redirect(request.META.get('HTTP_REFERER', reverse('home')))
+
+# NEW: View to handle deletion of an image contribution
+@login_required
+def delete_image_contribution(request, pk):
+    if request.method == 'POST':
+        contribution = get_object_or_404(ImageContribution, pk=pk)
+        story_sender = contribution.story_sender # Get story_sender before deleting contribution
+        if request.user == story_sender.story.organiser:
+            contribution.delete()
+            messages.success(request, "Image contribution deleted successfully.")
+            _check_and_update_story_sender_status(story_sender) # Call helper after deletion
+        else:
+            messages.error(request, "You are not authorized to delete this contribution.")
+    return redirect(request.META.get('HTTP_REFERER', reverse('home')))
+
+# NEW: View to handle deletion of a video contribution
+@login_required
+def delete_video_contribution(request, pk):
+    if request.method == 'POST':
+        contribution = get_object_or_404(VideoContribution, pk=pk)
+        story_sender = contribution.story_sender # Get story_sender before deleting contribution
+        if request.user == story_sender.story.organiser:
+            contribution.delete()
+            messages.success(request, "Video contribution deleted successfully.")
+            _check_and_update_story_sender_status(story_sender) # Call helper after deletion
+        else:
+            messages.error(request, "You are not authorized to delete this contribution.")
+    return redirect(request.META.get('HTTP_REFERER', reverse('home')))
 
 
 

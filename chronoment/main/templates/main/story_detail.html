@@ -1,59 +1,71 @@
 {# your_app_name/templates/your_app_name/story_detail.html #}
-{% extends 'main/base.html' %} {# Extends your base layout with the sidebar #}
-{% load static %} {# If you need to link to static files #}
+{% extends 'main/base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
     <div class="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
         <div class="text-center mb-8">
             <h1 class="text-4xl font-extrabold text-gray-900 leading-tight mb-2">
-                Story: <span class="text-indigo-600">{{ story.title }}</span> {# Changed text-primary to text-indigo-600 #}
+                Story: <span class="text-indigo-600">{{ story.title }}</span>
             </h1>
-            <p class="text-lg text-gray-600">Created by {{ story.organiser.first_name }} {{ story.organiser.last_name }}</p> {# Changed text-muted to text-gray-600 #}
+            <p class="text-lg text-gray-600">Created by {{ story.organiser.first_name }} {{ story.organiser.last_name }}</p>
         </div>
 
-        <div class="mb-6 border-b pb-3 border-gray-200"> {# Changed border-bottom to border-b #}
+        <div class="mb-6 border-b pb-3 border-gray-200">
             <h3 class="text-2xl font-semibold text-gray-800 mb-3">Main Message</h3>
             <p class="text-gray-700 text-lg leading-relaxed">{{ story.main_message }}</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"> {# Changed row g-4 to grid grid-cols-1 md:grid-cols-2 gap-4 #}
-            <div> {# Removed col-md-6 #}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
                 <h4 class="text-xl font-semibold text-gray-800 mb-2">Reveal Date</h4>
                 <p class="text-gray-700 text-lg">{{ story.reveal_date|date:"F j, Y" }}</p>
-                <p class="text-gray-600 mt-1">This story will be accessible on this date.</p> {# Changed text-muted to text-gray-600 #}
+                <p class="text-gray-600 mt-1">This story will be accessible on this date.</p>
             </div>
-            <div> {# Removed col-md-6 #}
+            <div>
                 <h4 class="text-xl font-semibold text-gray-800 mb-2">QR Code Link</h4>
                 {# The QR code URL is where receivers will scan to access the story #}
                 <a href="{{ story.qr_code_url }}" target="_blank" rel="noopener noreferrer"
-                   class="inline-flex items-center text-indigo-600 hover:text-indigo-500 font-semibold break-all"> {# Changed text-primary text-decoration-none font-weight-bold to Tailwind #}
+                   class="inline-flex items-center text-indigo-600 hover:text-indigo-500 font-semibold break-all">
                     {{ story.qr_code_url }}
-                    <svg class="w-5 h-5 ml-1" fill="currentColor" viewBox="0 0 16 16"> {# Changed ms-1 to ml-1 #}
+                    <svg class="w-5 h-5 ml-1" fill="currentColor" viewBox="0 0 16 16">
                         <path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/>
                         <path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0 0 1h2.793L6.354 9.146a.5.5 0 1 0 .708.708L15 1.707V4.5a.5.5 0 0 0 1 0v-4z"/>
                     </svg>
                 </a>
-                <p class="text-gray-600 mt-1">Share this link to invite senders or for receivers to access.</p> {# Changed text-muted to text-gray-600 #}
+                <p class="text-gray-600 mt-1">Share this link to invite senders or for receivers to access.</p>
             </div>
         </div>
 
-        <div class="text-center mt-8 pt-6 border-t border-gray-200"> {# Changed mt-4 pt-3 border-top to Tailwind #}
+        <div class="text-center mt-8 pt-6 border-t border-gray-200">
             <h4 class="text-xl font-semibold text-gray-700 mb-4">What's next?</h4>
-            <p class="text-gray-600 mb-4"> {# Changed text-muted to text-gray-600 #}
-                Now that your story is created, you can proceed to invite senders to contribute their memories.
-            </p>
-            {# UPDATED: This is the crucial link to the "Manage Senders" page #}
-            <a href="{% url 'manage_senders_for_story' story.id %}"
-               class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out mr-2"> {# Changed btn btn-primary btn-lg me-2 to Tailwind #}
-                Manage Senders
-                <svg class="w-5 h-5 ml-2" fill="currentColor" viewBox="0 0 16 16"> {# Changed ms-2 to ml-2 #}
-                    <path d="M1 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H1zm5-6a3 3 0 100-6 3 3 0 000 6z"/>
-                    <path fill-rule="evenodd" d="M13.5 5a.5.5 0 0 1 .5.5V7h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V8h-1.5a.5.5 0 0 1 0-1H13V5.5a.5.5 0 0 1 .5-.5z"/>
-                </svg>
-            </a>
+            
+            {# Conditional button to view revealed story #}
+            {% if is_revealed %}
+                <p class="text-gray-700 mb-4">This story has been revealed!</p>
+                <a href="{% url 'view_revealed_story' story.id %}"
+                   class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-150 ease-in-out mr-2">
+                    View Revealed Story
+                    <svg class="w-5 h-5 ml-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path></svg>
+                </a>
+            {% else %}
+                <p class="text-gray-600 mb-4">
+                    This story will be revealed on **{{ story.reveal_date|date:"F j, Y" }}**.
+                    You can manage senders now, and view the collected memories after the reveal date.
+                </p>
+                <a href="{% url 'manage_senders_for_story' story.id %}"
+                   class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out mr-2">
+                    Manage Senders
+                    <svg class="w-5 h-5 ml-2" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M1 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H1zm5-6a3 3 0 100-6 3 3 0 000 6z"/>
+                        <path fill-rule="evenodd" d="M13.5 5a.5.5 0 0 1 .5.5V7h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V8h-1.5a.5.5 0 0 1 0-1H13V5.5a.5.5 0 0 1 .5-.5z"/>
+                    </svg>
+                </a>
+            {% endif %}
+
             <a href="{% url 'home' %}"
-               class="inline-flex items-center justify-center px-6 py-3 border border-gray-300 rounded-lg shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out"> {# Changed btn btn-secondary btn-lg to Tailwind #}
+               class="inline-flex items-center justify-center px-6 py-3 border border-gray-300 rounded-lg shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
                 Back to Dashboard
             </a>
         </div>
