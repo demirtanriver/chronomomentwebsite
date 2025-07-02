@@ -3,8 +3,8 @@
 {% load static %}
 
 {% block content %}
-<div class="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+{# REMOVED: <div class="min-h-screen flex items-center justify-center bg-gray-100 p-4"> #}
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md"> {# This div is now directly centered by base.html's .main #}
         <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">Login</h2>
 
         {# Display messages here, just like in your register template #}
@@ -38,7 +38,7 @@
             {% csrf_token %} {# Always include this for security! #}
 
             {# Hidden fields #}
-            <!-- {{ form.hidden_fields }} {# Uncommented this line #} -->
+            <!-- {{ form.hidden_fields }} -->
 
             {# Username/Email Field (Django's AuthenticationForm typically uses 'username') #}
             <div class="relative">
@@ -98,5 +98,4 @@
             Don't have an account? <a href="{% url 'register' %}" class="font-medium text-indigo-600 hover:text-indigo-500">Register now</a>
         </p>
     </div>
-</div>
 {% endblock %}

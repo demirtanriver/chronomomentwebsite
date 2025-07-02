@@ -164,44 +164,40 @@ class StorySenders(models.Model):
 
 
 
-class Media(models.Model):
-    # Foreign Keys to link Media to Story and Sender
-    story = models.ForeignKey(
-        'Stories',
-        on_delete=models.CASCADE, # If a story is deleted, its media is also deleted
-        related_name='media_items' # Allows reverse access from Story object: story.media_items.all()
-    )
-    sender = models.ForeignKey(
-        'Senders',
-        on_delete=models.CASCADE, # If a sender is deleted, their uploaded media is also deleted
-        related_name='uploaded_media' # Allows reverse access from Sender object: sender.uploaded_media.all()
-    )
+class TextContribution(models.Model):
+    story_sender = models.ForeignKey(StorySenders, on_delete=models.CASCADE, related_name='text_contributions')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
 
-    # Media Content Information
-    MEDIA_TYPE_CHOICES = [
-        ('image', 'Image'),
-        ('video', 'Video'),
-        ('text', 'Text Message'),
-    ]
-    media_type = models.CharField(
-        max_length=20,
-        choices=MEDIA_TYPE_CHOICES,
-        null=False
-    )
-    s3_url = models.TextField(null=True, blank=True) # URL to the media file in S3 (for image/video)
-    message_content = models.TextField(null=True, blank=True) # Actual text message content
-
-    # Optional Description
-    description = models.TextField(null=True, blank=True) # Caption/description for the media
-
-    # Timestamps for auditing
-    uploaded_at = models.DateTimeField(auto_now_add=True) # Renamed from created_at to be more specific
-
-    # This method is used to define a human-readable representation of the object.
     def __str__(self):
-        if self.media_type == 'text':
-            return f"Text for '{self.story.title}' by {self.sender.name or self.sender.email}"
-        return f"{self.media_type.capitalize()} for '{self.story.title}' by {self.sender.name or self.sender.email}"
+        return f"Text from {self.story_sender.sender.email} to {self.story_sender.story.title}"
 
-    class Meta:
-        verbose_name_plural = "Media" # Fixes pluralization in Django admin
+# NEW: Image Contribution Model
+class ImageContribution(models.Model):
+    story_sender = models.ForeignKey(StorySenders, on_delete=models.CASCADE, related_name='image_contributions')
+    # The 'upload_to' argument specifies a subdirectory within MEDIA_ROOT
+    image = models.ImageField(upload_to='contributions/images/') 
+    caption = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Image from {self.story_sender.sender.email} to {self.story_sender.story.title}"
+
+
+class VideoContribution(models.Model):
+    story_sender = models.ForeignKey(StorySenders, on_delete=models.CASCADE, related_name='video_contributions')
+    # Make video file optional
+    video = models.FileField(upload_to='contributions/videos/', blank=True, null=True) 
+    # New field for YouTube URL
+    youtube_url = models.URLField(max_length=200, blank=True, null=True)
+    # New field to store the extracted YouTube video ID for embedding
+    youtube_video_id = models.CharField(max_length=50, blank=True, null=True) 
+    caption = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        if self.youtube_url:
+            return f"YouTube Video from {self.story_sender.sender.email} to {self.story_sender.story.title}"
+        elif self.video:
+            return f"Uploaded Video from {self.story_sender.sender.email} to {self.story_sender.story.title}"
+        return f"Video Contribution from {self.story_sender.sender.email} to {self.story_sender.story.title}"

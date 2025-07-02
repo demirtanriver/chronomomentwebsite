@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -147,4 +147,24 @@ LOGIN_REDIRECT_URL = '/home/' # Or your actual home/dashboard URL
 # URL to redirect after logout
 LOGOUT_REDIRECT_URL = '/login/' # Or where you want users to go after logout
 
-# ... rest of your settings ...
+
+
+# Email Configuration for Development (prints emails to your console)
+# This is ideal for testing during development as it doesn't require a real SMTP server.
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# This email address will appear as the sender of the invitation emails.
+EMAIL_HOST_USER = 'demirtanriver@gmail.com' 
+
+# For a production environment, you would typically use an SMTP backend
+# provided by an email service (e.g., SendGrid, Mailgun, AWS SES, Gmail SMTP).
+# Example for a real SMTP setup (uncomment and configure when deploying):
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.example.com' # Replace with your SMTP host
+# EMAIL_PORT = 587 # Common port for TLS
+# EMAIL_USE_TLS = True # Use TLS for secure connection
+# EMAIL_HOST_USER = 'your_smtp_username' # Your SMTP username
+# EMAIL_HOST_PASSWORD = 'your_smtp_password' # Your SMTP password
+
+# Media files (user-uploaded content)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # This will create a 'media' folder in your project root
