@@ -9,6 +9,7 @@ urlpatterns = [
     path("<int:id>",views.index, name="index"),
     path("register/",views.register, name="register"),
     path('login/', views.login, name='login'),
+    path('learn-more/', views.learn_more_page, name='learn_more'),
      # URL for creating a new story
     path('stories/create/', views.create_story, name='create_story'),
 
@@ -39,6 +40,8 @@ urlpatterns = [
     path('contributions/text/<int:pk>/delete/', views.delete_text_contribution, name='delete_text_contribution'),
     path('contributions/image/<int:pk>/delete/', views.delete_image_contribution, name='delete_image_contribution'),
     path('contributions/video/<int:pk>/delete/', views.delete_video_contribution, name='delete_video_contribution'),
+
+    
 ]
 
 

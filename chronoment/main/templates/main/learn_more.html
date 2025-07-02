@@ -1,0 +1,65 @@
+{# your_app_name/templates/your_app_name/learn_more.html #}
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block content %}
+{# Removed bg-gray-50 from this div. It will now inherit the background from base.html's main-content/grid-container. #}
+<div class="flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 lg:p-8">
+    <div class="bg-white rounded-3xl shadow-xl p-8 sm:p-10 lg:p-12 max-w-3xl text-center">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-6">
+            For Senders & Receivers
+        </h1>
+        <p class="text-lg sm:text-xl text-gray-700 leading-relaxed mb-8">
+            Contribute photos, videos, or messages to a story you're invited to, or scan a QR code on the reveal date to unlock a beautiful collection of memories.
+        </p>
+        
+        {# Placeholder for more content sections #}
+        <div class="mt-10 pt-8 border-t border-gray-200">
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-6">How Chronoment Works</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+                <div class="flex flex-col items-center md:items-start p-4 bg-gray-50 rounded-lg shadow-sm">
+                    <div class="flex-shrink-0 mb-4">
+                        <svg class="h-10 w-10 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5s3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18s-3.332.477-4.5 1.253"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-2">For Senders</h3>
+                    <p class="text-gray-600">
+                        Receive a unique invitation link from an organiser. Use this link to privately upload your photos, videos, and heartfelt messages. Your contributions will be stored securely until the reveal date.
+                    </p>
+                </div>
+                <div class="flex flex-col items-center md:items-start p-4 bg-gray-50 rounded-lg shadow-sm">
+                    <div class="flex-shrink-0 mb-4">
+                        <svg class="h-10 w-10 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-2">For Receivers</h3>
+                    <p class="text-gray-600">
+                        On the special reveal date, scan the QR code provided by the organiser. This will unlock a beautiful, private slideshow of all the collected memories, a truly unique gift!
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-10 pt-8 border-t border-gray-200">
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-6">Why Chronoment?</h2>
+            <ul class="list-disc list-inside text-lg sm:text-xl text-gray-700 leading-relaxed space-y-3 text-left mx-auto max-w-xl">
+                <li><span class="font-semibold text-indigo-700">Private & Secure:</span> All contributions are kept private until the reveal date.</li>
+                <li><span class="font-semibold text-indigo-700">Easy to Use:</span> Simple invitation process for organisers and intuitive upload for senders.</li>
+                <li><span class="font-semibold text-indigo-700">Memorable Gift:</span> Create a truly unique and heartfelt memory collection for any occasion.</li>
+                <li><span class="font-semibold text-indigo-700">Versatile Media:</span> Supports text messages, images, and videos (including YouTube links).</li>
+            </ul>
+        </div>
+
+        <div class="mt-10">
+            <a href="{% url 'home' %}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200">
+                Back to Home
+                <svg class="ml-3 -mr-1 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock content %}

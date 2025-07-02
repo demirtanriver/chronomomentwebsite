@@ -32,6 +32,10 @@ from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth import authenticate, login as auth_login # Renamed login to avoid conflict
 from django.contrib.auth.forms import AuthenticationForm # This form provides 'username' and 'password' fields
+from itertools import chain
+from django.db import models
+import json # <--- NEW: Import json module
+from django.core.serializers.json import DjangoJSONEncoder
 # Create your views here.
 
 def index(response,id):
@@ -574,45 +578,126 @@ def my_stories(request):
 
 
 def view_story_by_topper(request, topper_identifier):
-    # Try to find the story by the unique topper_identifier
     try:
         story = Stories.objects.get(topper_identifier=topper_identifier)
     except Stories.DoesNotExist:
         messages.error(request, "No story found for this topper code.")
-        return redirect(reverse('home')) # Or a specific 'topper_not_found' page
+        return redirect(reverse('home'))
 
-    # Check if the story has been revealed
     if story.reveal_date > timezone.now().date():
         messages.warning(request, "This story has not been revealed yet. Please check back on the reveal date.")
-        # If the user is an organiser and logged in, redirect them to their story detail page
         if request.user.is_authenticated and request.user == story.organiser:
             return redirect(reverse('story_detail', args=[story.id]))
-        # Otherwise, redirect to home or a generic "not yet revealed" page
-        return redirect(reverse('home')) # Or a specific 'not_revealed' page
+        return redirect(reverse('home'))
 
-    # If revealed, fetch all contributions related to this story
+    # Fetch all APPROVED contributions for this story
     story_senders_for_story = StorySenders.objects.filter(story=story)
 
+    # Fetch and prepare text contributions
     text_contributions = TextContribution.objects.filter(
-        story_sender__in=story_senders_for_story
-    ).order_by('created_at')
+        story_sender__in=story_senders_for_story,
+        is_approved=True
+    ).annotate(
+        contributor_name=models.Case(
+            models.When(story_sender__sender__name__isnull=False, then=models.F('story_sender__sender__name')),
+            default=models.F('story_sender__sender__email'),
+            output_field=models.CharField()
+        )
+    ).values(
+        'id', 'content', 'created_at', 'contributor_name'
+    ).annotate(
+        type=models.Value('text', output_field=models.CharField())
+    )
 
+    # Fetch and prepare image contributions - CRITICAL: Use .url for image field
     image_contributions = ImageContribution.objects.filter(
-        story_sender__in=story_senders_for_story
-    ).order_by('created_at')
+        story_sender__in=story_senders_for_story,
+        is_approved=True
+    ).annotate(
+        contributor_name=models.Case(
+            models.When(story_sender__sender__name__isnull=False, then=models.F('story_sender__sender__name')),
+            default=models.F('story_sender__sender__email'),
+            output_field=models.CharField()
+        )
+    ).values(
+        'id', 'caption', 'created_at', 'contributor_name'
+    ).annotate(
+        # Manually add the image URL using F() expression if possible, or iterate later
+        # For simplicity and direct JSON serialization, we'll get the object and process it.
+        # This requires fetching full objects, not just values.
+        type=models.Value('image', output_field=models.CharField())
+    )
 
+    # Fetch and prepare video contributions - CRITICAL: Use .url for video field
     video_contributions = VideoContribution.objects.filter(
-        story_sender__in=story_senders_for_story
-    ).order_by('created_at')
+        story_sender__in=story_senders_for_story,
+        is_approved=True
+    ).annotate(
+        contributor_name=models.Case(
+            models.When(story_sender__sender__name__isnull=False, then=models.F('story_sender__sender__name')),
+            default=models.F('story_sender__sender__email'),
+            output_field=models.CharField()
+        )
+    ).values(
+        'id', 'youtube_url', 'youtube_video_id', 'caption', 'created_at', 'contributor_name'
+    ).annotate(
+        # Manually add the video URL using F() expression if possible, or iterate later
+        # This also requires fetching full objects, not just values.
+        type=models.Value('video', output_field=models.CharField())
+    )
+
+    # To get the .url for File/ImageFields, we need to fetch the full objects
+    # and then manually convert them to dictionaries with the correct URLs.
+    processed_contributions = []
+
+    for text_c in text_contributions:
+        processed_contributions.append(text_c)
     
+    # Process Image Contributions
+    for img_c in ImageContribution.objects.filter(
+        story_sender__in=story_senders_for_story,
+        is_approved=True
+    ).select_related('story_sender__sender'): # Select related to avoid N+1 queries
+        processed_contributions.append({
+            'id': img_c.id,
+            'type': 'image',
+            'image': img_c.image.url if img_c.image else None, # Get the URL here
+            'caption': img_c.caption,
+            'created_at': img_c.created_at,
+            'contributor_name': img_c.story_sender.sender.name if img_c.story_sender.sender.name else img_c.story_sender.sender.email,
+        })
+
+    # Process Video Contributions
+    for vid_c in VideoContribution.objects.filter(
+        story_sender__in=story_senders_for_story,
+        is_approved=True
+    ).select_related('story_sender__sender'): # Select related to avoid N+1 queries
+        processed_contributions.append({
+            'id': vid_c.id,
+            'type': 'video',
+            'video': vid_c.video.url if vid_c.video else None, # Get the URL here
+            'youtube_url': vid_c.youtube_url,
+            'youtube_video_id': vid_c.youtube_video_id,
+            'caption': vid_c.caption,
+            'created_at': vid_c.created_at,
+            'contributor_name': vid_c.story_sender.sender.name if vid_c.story_sender.sender.name else vid_c.story_sender.sender.email,
+        })
+
+    # Combine all contributions and sort them by created_at
+    all_contributions_sorted = sorted(
+        processed_contributions,
+        key=lambda x: x['created_at']
+    )
+    
+    # Serialize the contributions list to JSON using Django's encoder
+    json_contributions = json.dumps(list(all_contributions_sorted), cls=DjangoJSONEncoder)
+
     context = {
         'story': story,
-        'text_contributions': text_contributions,
-        'image_contributions': image_contributions,
-        'video_contributions': video_contributions,
-        'page_title': f"Revealed Story: {story.title}"
+        'contributions': json_contributions, # Pass the JSON string
+        'page_title': f"Story Slideshow: {story.title}"
     }
-    return render(request, 'main/revealed_story.html', context)
+    return render(request, 'main/story_slideshow.html', context) # Render new slideshow template
 
 # Original view_revealed_story (now potentially redundant if view_story_by_topper is the primary public view)
 # You can remove this or keep it if you foresee another use case for direct story_id access
@@ -777,6 +862,14 @@ def delete_video_contribution(request, pk):
     return redirect(request.META.get('HTTP_REFERER', reverse('home')))
 
 
+def learn_more_page(request):
+    """
+    Renders the 'Learn More' page, providing information for Senders & Receivers.
+    """
+    context = {
+        'page_title': 'Learn More about Chronoment'
+    }
+    return render(request, 'main/learn_more.html', context)
 
 
 
