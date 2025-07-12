@@ -4,107 +4,82 @@
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
-    <div class="bg-white p-8 rounded-xl shadow-lg max-w-3xl mx-auto">
-        <div class="text-center mb-8">
-            <h1 class="text-4xl font-extrabold text-gray-900 leading-tight mb-2">
-                Contributions by <span class="text-indigo-600">{{ sender_name }}</span>
-            </h1>
-            <p class="text-lg text-gray-600">for Story: "{{ story.title }}"</p>
-        </div>
-
-        {# Display Django messages #}
-        {% if messages %}
-            <div class="mb-6">
-                {% for message in messages %}
-                    <div class="px-4 py-3 rounded-md relative mb-2
-                        {% if message.tags == 'success' %}bg-green-100 border border-green-400 text-green-700{% endif %}
-                        {% if message.tags == 'error' %}bg-red-100 border border-red-400 text-red-700{% endif %}
-                        {% if message.tags == 'info' %}bg-blue-100 border border-blue-400 text-blue-700{% endif %}
-                        {% if message.tags == 'warning' %}bg-yellow-100 border border-yellow-400 text-yellow-700{% endif %}">
-                        <span class="block sm:inline">{{ message }}</span>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
+    <div class="bg-white p-8 rounded-xl shadow-lg max-w-4xl mx-auto">
+        <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">
+            Contributions from <span class="text-indigo-600">{{ sender_name }}</span> for <span class="text-indigo-600">'{{ story.title }}'</span>
+        </h2>
 
         {% if text_contributions or image_contributions or video_contributions %}
             <div class="space-y-8">
                 {# Text Contributions #}
                 {% if text_contributions %}
-                    <div class="border border-gray-200 p-6 rounded-lg shadow-sm">
-                        <h3 class="text-2xl font-semibold text-gray-800 mb-4">Text Messages</h3>
-                        <div class="space-y-4">
+                    <div class="p-6 border border-gray-200 rounded-lg shadow-sm">
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-4">Text Contributions</h3>
+                        <ul class="space-y-4">
                             {% for text_c in text_contributions %}
-                                <div class="bg-gray-50 p-4 rounded-md relative">
-                                    <p class="text-gray-800 text-base leading-relaxed">{{ text_c.content }}</p>
-                                    <p class="text-gray-500 text-xs mt-2">
-                                        Contributed on: {{ text_c.created_at|date:"F j, Y, H:i" }}
-                                        <span class="ml-4 font-semibold
-                                            {% if text_c.is_approved %}text-green-600{% else %}text-red-600{% endif %}">
-                                            Status: {% if text_c.is_approved %}Approved{% else %}Pending Approval{% endif %}
-                                        </span>
-                                    </p>
-                                    <div class="mt-4 flex space-x-2">
-                                        {% if not text_c.is_approved %}
-                                            <form method="post" action="{% url 'approve_text_contribution' text_c.pk %}" class="inline-block">
+                                <li class="bg-gray-50 p-4 rounded-lg shadow-md flex justify-between items-center">
+                                    <div>
+                                        <p class="text-gray-800 text-lg">{{ text_c.content }}</p>
+                                        <p class="text-xs text-gray-500 mt-1">Contributed: {{ text_c.created_at|date:"M j, Y H:i" }}</p>
+                                        <p class="text-xs text-gray-500">Status: <span class="font-semibold 
+                                            {% if text_c.status == 'approved' %}text-green-600{% elif text_c.status == 'ignored' %}text-yellow-600{% else %}text-blue-600{% endif %}">
+                                            {{ text_c.get_status_display }}
+                                        </span></p>
+                                    </div>
+                                    <div class="flex space-x-2 mt-2 md:mt-0">
+                                        {% if text_c.status == 'pending' %}
+                                            <form method="post" action="{% url 'approve_text_contribution' text_c.id %}" class="inline">
                                                 {% csrf_token %}
-                                                <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out">
-                                                    Approve
-                                                </button>
+                                                <button type="submit" class="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm">Approve</button>
+                                            </form>
+                                            <form method="post" action="{% url 'ignore_text_contribution' text_c.id %}" class="inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="px-3 py-1 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 text-sm">Ignore</button>
                                             </form>
                                         {% endif %}
-                                        <form method="post" action="{% url 'delete_text_contribution' text_c.pk %}" class="inline-block" onsubmit="return confirm('Are you sure you want to delete this text contribution? This action cannot be undone.');">
+                                        <form method="post" action="{% url 'delete_text_contribution' text_c.id %}" class="inline" onsubmit="return confirm('Are you sure you want to delete this text contribution?');">
                                             {% csrf_token %}
-                                            <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out">
-                                                Delete
-                                            </button>
+                                            <button type="submit" class="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm">Delete</button>
                                         </form>
                                     </div>
-                                </div>
+                                </li>
                             {% endfor %}
-                        </div>
+                        </ul>
                     </div>
                 {% endif %}
 
                 {# Image Contributions #}
                 {% if image_contributions %}
-                    <div class="border border-gray-200 p-6 rounded-lg shadow-sm">
-                        <h3 class="text-2xl font-semibold text-gray-800 mb-4">Images</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="p-6 border border-gray-200 rounded-lg shadow-sm">
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-4">Image Contributions</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {% for img_c in image_contributions %}
-                                <div class="bg-gray-50 p-3 rounded-md flex flex-col items-center text-center relative">
-                                    {% if img_c.image %}
-                                        <img src="{{ img_c.image.url }}" alt="{{ img_c.caption|default:'Contributed image' }}" 
-                                             class="w-full h-48 object-cover rounded-md mb-3 shadow-sm">
+                                <div class="bg-gray-50 p-4 rounded-lg shadow-md">
+                                    {% if img_c.presigned_url %} {# Use presigned_url here #}
+                                        <img src="{{ img_c.presigned_url }}" alt="{{ img_c.caption|default:'Image contribution' }}" class="w-full h-48 object-cover rounded-md mb-2">
                                     {% else %}
-                                        <div class="w-full h-48 bg-gray-200 rounded-md mb-3 flex items-center justify-center text-gray-500">
-                                            No Image Available
-                                        </div>
+                                        <div class="w-full h-48 bg-gray-200 flex items-center justify-center rounded-md mb-2 text-gray-500">No Image Preview</div>
                                     {% endif %}
-                                    {% if img_c.caption %}
-                                        <p class="text-gray-800 text-sm font-medium mb-1">{{ img_c.caption }}</p>
-                                    {% endif %}
-                                    <p class="text-gray-500 text-xs">
-                                        Contributed on: {{ img_c.created_at|date:"F j, Y, H:i" }}
-                                        <span class="ml-4 font-semibold
-                                            {% if img_c.is_approved %}text-green-600{% else %}text-red-600{% endif %}">
-                                            Status: {% if img_c.is_approved %}Approved{% else %}Pending Approval{% endif %}
-                                        </span>
-                                    </p>
-                                    <div class="mt-4 flex space-x-2">
-                                        {% if not img_c.is_approved %}
-                                            <form method="post" action="{% url 'approve_image_contribution' img_c.pk %}" class="inline-block">
+                                    <p class="text-sm text-gray-700">{{ img_c.caption }}</p>
+                                    <p class="text-xs text-gray-500 mt-1">Uploaded: {{ img_c.created_at|date:"M j, Y H:i" }}</p>
+                                    <p class="text-xs text-gray-500">Status: <span class="font-semibold 
+                                        {% if img_c.status == 'approved' %}text-green-600{% elif img_c.status == 'ignored' %}text-yellow-600{% else %}text-blue-600{% endif %}">
+                                        {{ img_c.get_status_display }}
+                                    </span></p>
+                                    <div class="flex space-x-2 mt-3">
+                                        {% if img_c.status == 'pending' %}
+                                            <form method="post" action="{% url 'approve_image_contribution' img_c.id %}" class="inline">
                                                 {% csrf_token %}
-                                                <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out">
-                                                    Approve
-                                                </button>
+                                                <button type="submit" class="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm">Approve</button>
+                                            </form>
+                                            <form method="post" action="{% url 'ignore_image_contribution' img_c.id %}" class="inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="px-3 py-1 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 text-sm">Ignore</button>
                                             </form>
                                         {% endif %}
-                                        <form method="post" action="{% url 'delete_image_contribution' img_c.pk %}" class="inline-block" onsubmit="return confirm('Are you sure you want to delete this image contribution? This action cannot be undone.');">
+                                        <form method="post" action="{% url 'delete_image_contribution' img_c.id %}" class="inline" onsubmit="return confirm('Are you sure you want to delete this image contribution?');">
                                             {% csrf_token %}
-                                            <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out">
-                                                Delete
-                                            </button>
+                                            <button type="submit" class="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm">Delete</button>
                                         </form>
                                     </div>
                                 </div>
@@ -115,54 +90,43 @@
 
                 {# Video Contributions #}
                 {% if video_contributions %}
-                    <div class="border border-gray-200 p-6 rounded-lg shadow-sm">
-                        <h3 class="text-2xl font-semibold text-gray-800 mb-4">Videos</h3>
-                        <div class="grid grid-cols-1 gap-4">
+                    <div class="p-6 border border-gray-200 rounded-lg shadow-sm">
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-4">Video Contributions</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {% for vid_c in video_contributions %}
-                                <div class="bg-gray-50 p-4 rounded-md relative">
+                                <div class="bg-gray-50 p-4 rounded-lg shadow-md">
                                     {% if vid_c.youtube_video_id %}
-                                        <div class="relative" style="padding-bottom: 56.25%; height: 0; overflow: hidden;">
-                                            <iframe class="absolute top-0 left-0 w-full h-full rounded-md"
-                                                    src="https://www.youtube.com/embed/{{ vid_c.youtube_video_id }}" 
-                                                    frameborder="0" 
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                                    allowfullscreen>
-                                            </iframe>
+                                        <div class="relative" style="padding-bottom: 56.25%;">
+                                            <iframe class="absolute top-0 left-0 w-full h-full rounded-md" src="https://www.youtube.com/embed/{{ vid_c.youtube_video_id }}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
                                         </div>
-                                    {% elif vid_c.video %}
-                                        <video controls class="w-full h-auto rounded-md shadow-sm">
-                                            <source src="{{ vid_c.video.url }}" type="video/mp4">
+                                    {% elif vid_c.presigned_url %} {# Use presigned_url here #}
+                                        <video controls class="w-full h-48 object-cover rounded-md mb-2">
+                                            <source src="{{ vid_c.presigned_url }}" type="video/mp4"> {# Assuming MP4 #}
                                             Your browser does not support the video tag.
                                         </video>
                                     {% else %}
-                                        <div class="w-full h-48 bg-gray-200 rounded-md flex items-center justify-center text-gray-500">
-                                            No Video Available
-                                        </div>
+                                        <div class="w-full h-48 bg-gray-200 flex items-center justify-center rounded-md mb-2 text-gray-500">No Video Preview</div>
                                     {% endif %}
-                                    {% if vid_c.caption %}
-                                        <p class="text-gray-800 text-sm font-medium mt-3 mb-1">{{ vid_c.caption }}</p>
-                                    {% endif %}
-                                    <p class="text-gray-500 text-xs">
-                                        Contributed on: {{ vid_c.created_at|date:"F j, Y, H:i" }}
-                                        <span class="ml-4 font-semibold
-                                            {% if vid_c.is_approved %}text-green-600{% else %}text-red-600{% endif %}">
-                                            Status: {% if vid_c.is_approved %}Approved{% else %}Pending Approval{% endif %}
-                                        </span>
-                                    </p>
-                                    <div class="mt-4 flex space-x-2">
-                                        {% if not vid_c.is_approved %}
-                                            <form method="post" action="{% url 'approve_video_contribution' vid_c.pk %}" class="inline-block">
+                                    <p class="text-sm text-gray-700">{{ vid_c.caption }}</p>
+                                    <p class="text-xs text-gray-500 mt-1">Uploaded: {{ vid_c.created_at|date:"M j, Y H:i" }}</p>
+                                    <p class="text-xs text-gray-500">Status: <span class="font-semibold 
+                                        {% if vid_c.status == 'approved' %}text-green-600{% elif vid_c.status == 'ignored' %}text-yellow-600{% else %}text-blue-600{% endif %}">
+                                        {{ vid_c.get_status_display }}
+                                    </span></p>
+                                    <div class="flex space-x-2 mt-3">
+                                        {% if vid_c.status == 'pending' %}
+                                            <form method="post" action="{% url 'approve_video_contribution' vid_c.id %}" class="inline">
                                                 {% csrf_token %}
-                                                <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out">
-                                                    Approve
-                                                </button>
+                                                <button type="submit" class="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm">Approve</button>
+                                            </form>
+                                            <form method="post" action="{% url 'ignore_video_contribution' vid_c.id %}" class="inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="px-3 py-1 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 text-sm">Ignore</button>
                                             </form>
                                         {% endif %}
-                                        <form method="post" action="{% url 'delete_video_contribution' vid_c.pk %}" class="inline-block" onsubmit="return confirm('Are you sure you want to delete this video contribution? This action cannot be undone.');">
+                                        <form method="post" action="{% url 'delete_video_contribution' vid_c.id %}" class="inline" onsubmit="return confirm('Are you sure you want to delete this video contribution?');">
                                             {% csrf_token %}
-                                            <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out">
-                                                Delete
-                                            </button>
+                                            <button type="submit" class="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm">Delete</button>
                                         </form>
                                     </div>
                                 </div>
@@ -172,14 +136,13 @@
                 {% endif %}
             </div>
         {% else %}
-            <div class="text-center py-8">
-                <p class="text-gray-600 text-lg mb-4">No contributions found from {{ sender_name }} for this story yet.</p>
-            </div>
+            <p class="text-center text-gray-600 text-lg">No contributions have been made by this sender yet.</p>
         {% endif %}
 
         <div class="text-center mt-8 pt-6 border-t border-gray-200">
-            <a href="{% url 'manage_senders_for_story' story.id %}" class="font-medium text-indigo-600 hover:text-indigo-500">Back to Manage Senders</a>
+            <a href="{% url 'manage_senders_for_story' story.id %}" class="font-medium text-indigo-600 hover:text-indigo-500 mr-4">Back to Manage Senders</a>
+            <a href="{% url 'story_detail' story.id %}" class="font-medium text-gray-600 hover:text-gray-800">Back to Story Details</a>
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock content %}

@@ -3,228 +3,197 @@
 {% load static %}
 
 {% block content %}
-<div class="p-4 w-full max-w-4xl mx-auto"> {# Increased max-width for better layout of multiple sections #}
-    <div class="bg-white p-8 rounded-xl shadow-lg">
-        <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">
-            Contribute to <span class="text-indigo-600">'{{ story.title }}'</span>
-        </h2>
-        <p class="text-center text-gray-600 mb-6">
-            Welcome, <span class="font-semibold">{{ sender.name|default:sender.email }}</span>!
-            Share your memories for this story.
-        </p>
-
-        {# Display Django messages #}
-        {% if messages %}
-            <div class="mb-6">
-                {% for message in messages %}
-                    <div class="px-4 py-3 rounded-md relative mb-2
-                        {% if message.tags == 'success' %}bg-green-100 border border-green-400 text-green-700{% endif %}
-                        {% if message.tags == 'error' %}bg-red-100 border border-red-400 text-red-700{% endif %}
-                        {% if message.tags == 'info' %}bg-blue-100 border border-blue-400 text-blue-700{% endif %}
-                        {% if message.tags == 'warning' %}bg-yellow-100 border border-yellow-400 text-yellow-700{% endif %}">
-                        <span class="block sm:inline">{{ message }}</span>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-
-        {# Conditional rendering for expired token #}
+<div class="container mx-auto px-4 py-8">
+    <div class="bg-white p-8 rounded-xl shadow-lg max-w-4xl mx-auto">
         {% if expired %}
-            <div class="text-center py-8">
-                <p class="text-red-600 text-xl font-semibold mb-4">This invitation link has expired.</p>
-                <p class="text-gray-700 mb-6">Please contact the story organiser if you need a new invitation.</p>
-                <a href="{% url 'home' %}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
-                    Back to Home
+            <h2 class="text-3xl font-bold text-center text-red-600 mb-6">Invitation Expired</h2>
+            <p class="text-center text-gray-700 mb-4">
+                Unfortunately, the invitation link for '{{ story.title }}' has expired.
+            </p>
+            <p class="text-center text-gray-700 mb-6">
+                Please contact the story organiser ({{ story.organiser.first_name }} {{ story.organiser.last_name }}) to request a new invitation.
+            </p>
+            <div class="text-center mt-6">
+                <a href="{% url 'home' %}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Go to Home
                 </a>
             </div>
         {% else %}
-            {# --- Contribution Forms Section --- #}
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+            <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">
+                Contribute to <span class="text-indigo-600">'{{ story.title }}'</span>
+            </h2>
+            <p class="text-center text-gray-600 mb-6">
+                Welcome, <span class="font-semibold">{{ sender.name|default:sender.email }}</span>! Share your memories for this story.
+            </p>
+
+            {# Contribution Forms Section #}
+            <div class="mb-10 p-6 border border-gray-200 rounded-lg shadow-sm">
+                <h3 class="text-2xl font-semibold text-gray-800 mb-6">Add Your Contribution</h3>
+                
+                {# Tabs for contribution types #}
+                <div class="flex border-b border-gray-200 mb-6">
+                    <button class="tab-button flex-1 py-3 text-center text-lg font-medium text-gray-600 hover:text-indigo-600 border-b-2 border-transparent hover:border-indigo-500 transition duration-150 ease-in-out active-tab" data-tab="text-tab">Text</button>
+                    <button class="tab-button flex-1 py-3 text-center text-lg font-medium text-gray-600 hover:text-indigo-600 border-b-2 border-transparent hover:border-indigo-500 transition duration-150 ease-in-out" data-tab="image-tab">Image</button>
+                    <button class="tab-button flex-1 py-3 text-center text-lg font-medium text-gray-600 hover:text-indigo-600 border-b-2 border-transparent hover:border-indigo-500 transition duration-150 ease-in-out" data-tab="video-tab">Video</button>
+                </div>
+
                 {# Text Contribution Form #}
-                <div class="p-6 border border-gray-200 rounded-lg shadow-sm bg-gray-50">
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Add a Message</h3>
-                    <form method="post" action="" class="space-y-4">
+                <div id="text-tab" class="tab-content active">
+                    <form method="post" enctype="multipart/form-data" class="space-y-4">
                         {% csrf_token %}
                         <input type="hidden" name="contribution_type" value="text">
-                        
                         <div>
-                            <label for="{{ text_form.content.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ text_form.content.label }}
-                            </label>
+                            <label for="{{ text_form.content.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Your Message</label>
                             {{ text_form.content }}
-                            {% for error in text_form.content.errors %}<p class="text-sm text-red-600 mt-1">{{ error }}</p>{% endfor %}
+                            {% if text_form.content.errors %}<p class="mt-1 text-sm text-red-600">{{ text_form.content.errors }}</p>{% endif %}
+                            <p class="mt-2 text-sm text-gray-500">Share your thoughts or memories.</p>
                         </div>
-                        <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            Submit Message
+                        <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            Add Message
                         </button>
                     </form>
                 </div>
 
                 {# Image Contribution Form #}
-                <div class="p-6 border border-gray-200 rounded-lg shadow-sm bg-gray-50">
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Upload an Image</h3>
-                    <form method="post" action="" enctype="multipart/form-data" class="space-y-4">
+                <div id="image-tab" class="tab-content hidden">
+                    <form method="post" enctype="multipart/form-data" class="space-y-4">
                         {% csrf_token %}
                         <input type="hidden" name="contribution_type" value="image">
-                        
                         <div>
-                            <label for="{{ image_form.image.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ image_form.image.label }}
-                            </label>
+                            <label for="{{ image_form.image.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Upload Image</label>
                             {{ image_form.image }}
-                            {% for error in image_form.image.errors %}<p class="text-sm text-red-600 mt-1">{{ error }}</p>{% endfor %}
+                            {% if image_form.image.errors %}<p class="mt-1 text-sm text-red-600">{{ image_form.image.errors }}</p>{% endif %}
+                            <p class="mt-2 text-sm text-gray-500">Supported formats: JPG, PNG. Max size: 5MB.</p>
                         </div>
                         <div>
-                            <label for="{{ image_form.caption.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ image_form.caption.label }}
-                            </label>
+                            <label for="{{ image_form.caption.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Caption (Optional)</label>
                             {{ image_form.caption }}
-                            {% for error in image_form.caption.errors %}<p class="text-sm text-red-600 mt-1">{{ error }}</p>{% endfor %}
+                            {% if image_form.caption.errors %}<p class="mt-1 text-sm text-red-600">{{ image_form.caption.errors }}</p>{% endif %}
+                            <p class="mt-2 text-sm text-gray-500">Describe your image.</p>
                         </div>
-                        <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                            Upload Image
+                        <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            Add Image
                         </button>
                     </form>
                 </div>
 
-                {# UPDATED: Video Contribution Form - now with YouTube URL option #}
-                <div class="p-6 border border-gray-200 rounded-lg shadow-sm bg-gray-50 lg:col-span-2"> {# Takes full width on large screens #}
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Upload a Video or Link from YouTube</h3>
-                    <form method="post" action="" enctype="multipart/form-data" class="space-y-4">
+                {# Video Contribution Form #}
+                <div id="video-tab" class="tab-content hidden">
+                    <form method="post" enctype="multipart/form-data" class="space-y-4">
                         {% csrf_token %}
                         <input type="hidden" name="contribution_type" value="video">
+                        <p class="text-sm text-gray-600 mb-4">You can either upload a video file or provide a YouTube video URL.</p>
                         
                         <div>
-                            <label for="{{ video_form.video.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ video_form.video.label }}
-                            </label>
+                            <label for="{{ video_form.video.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Upload Video File</label>
                             {{ video_form.video }}
-                            {% for error in video_form.video.errors %}<p class="text-sm text-red-600 mt-1">{{ error }}</p>{% endfor %}
-                            <p class="mt-2 text-sm text-gray-500">{{ video_form.video.help_text }}</p>
+                            {% if video_form.video.errors %}<p class="mt-1 text-sm text-red-600">{{ video_form.video.errors }}</p>{% endif %}
+                            <p class="mt-2 text-sm text-gray-500">Supported formats: MP4. Max size: 20MB.</p>
                         </div>
-
-                        <div class="relative flex items-center py-4">
-                            <div class="flex-grow border-t border-gray-300"></div>
-                            <span class="flex-shrink mx-4 text-gray-500 text-sm">OR</span>
-                            <div class="flex-grow border-t border-gray-300"></div>
-                        </div>
-
+                        <div class="text-center text-gray-500 my-4">OR</div>
                         <div>
-                            <label for="{{ video_form.youtube_url.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ video_form.youtube_url.label }}
-                            </label>
-                            {{ video_form.youtube_url }} {# THIS IS THE FIELD THAT WAS LIKELY MISSING OR MISPLACED #}
-                            {% for error in video_form.youtube_url.errors %}<p class="text-sm text-red-600 mt-1">{{ error }}</p>{% endfor %}
-                            <p class="mt-2 text-sm text-gray-500">{{ video_form.youtube_url.help_text }}</p>
+                            <label for="{{ video_form.youtube_url.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">YouTube Video URL</label> {# <-- CHANGED LABEL #}
+                            {{ video_form.youtube_url }} {# <-- CHANGED FIELD NAME #}
+                            {% if video_form.youtube_url.errors %}<p class="mt-1 text-sm text-red-600">{{ video_form.youtube_url.errors }}</p>{% endif %} {# <-- CHANGED FIELD NAME #}
+                            <p class="mt-2 text-sm text-gray-500">e.g., `https://www.youtube.com/watch?v=dQw4w9WgXcQ`</p> {# <-- CHANGED EXAMPLE #}
                         </div>
-
                         <div>
-                            <label for="{{ video_form.caption.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ video_form.caption.label }}
-                            </label>
+                            <label for="{{ video_form.caption.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Caption (Optional)</label>
                             {{ video_form.caption }}
-                            {% for error in video_form.caption.errors %}<p class="text-sm text-red-600 mt-1">{{ error }}</p>{% endfor %}
+                            {% if video_form.caption.errors %}<p class="mt-1 text-sm text-red-600">{{ video_form.caption.errors }}</p>{% endif %}
+                            <p class="mt-2 text-sm text-gray-500">Describe your video.</p>
                         </div>
-                        
-                        {% if video_form.non_field_errors %}
-                            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mt-4">
-                                <ul class="list-disc pl-5">
-                                    {% for error in video_form.non_field_errors %}
-                                        <li>{{ error }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                        {% endif %}
-
-                        <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                            Submit Video
+                        <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            Add Video
                         </button>
                     </form>
                 </div>
             </div>
 
-            {# --- Existing Contributions Section --- #}
+            {# Existing Contributions Section #}
             <div class="mt-10 p-6 border border-gray-200 rounded-lg shadow-sm">
-                <h3 class="text-2xl font-semibold text-gray-800 mb-6">Your Contributions</h3>
-
+                <h3 class="text-2xl font-semibold text-gray-800 mb-6">Your Existing Contributions</h3>
+                
                 {% if existing_text_contributions or existing_image_contributions or existing_video_contributions %}
-                    {# Existing Text Contributions #}
-                    {% if existing_text_contributions %}
-                        <div class="mb-6">
-                            <h4 class="text-xl font-medium text-gray-700 mb-3">Messages</h4>
-                            <ul class="space-y-3">
-                                {% for contribution in existing_text_contributions %}
-                                    <li class="bg-gray-100 p-4 rounded-md text-gray-800 flex justify-between items-start">
-                                        <p class="flex-grow">{{ contribution.content }}</p>
-                                        <span class="text-xs text-gray-500 ml-4 flex-shrink-0">{{ contribution.created_at|date:"M j, Y H:i" }}</span>
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    {% endif %}
+                    <ul class="space-y-6">
+                        {% for text_c in existing_text_contributions %}
+                            <li class="bg-gray-50 p-4 rounded-lg shadow-sm">
+                                <p class="text-gray-800 text-lg mb-2">{{ text_c.content }}</p>
+                                <p class="text-xs text-gray-500">Contributed: {{ text_c.created_at|date:"M j, Y H:i" }}</p>
+                                <p class="text-xs text-gray-500">Status: <span class="font-semibold text-blue-600">{{ text_c.get_status_display }}</span></p>
+                            </li>
+                        {% endfor %}
 
-                    {# Existing Image Contributions #}
-                    {% if existing_image_contributions %}
-                        <div class="mb-6">
-                            <h4 class="text-xl font-medium text-gray-700 mb-3">Images</h4>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                {% for contribution in existing_image_contributions %}
-                                    <div class="bg-gray-100 rounded-md overflow-hidden shadow-sm">
-                                        <img src="{{ contribution.image.url }}" alt="{{ contribution.caption|default:'Uploaded image' }}" class="w-full h-48 object-cover">
-                                        <div class="p-3">
-                                            {% if contribution.caption %}<p class="text-gray-800 font-medium">{{ contribution.caption }}</p>{% endif %}
-                                            <p class="text-xs text-gray-500 mt-1">{{ contribution.created_at|date:"M j, Y H:i" }}</p>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    {% endif %}
+                        {% for img_c in existing_image_contributions %}
+                            <li class="bg-gray-50 p-4 rounded-lg shadow-sm">
+                                {% if img_c.presigned_url %} {# Use presigned_url here #}
+                                    <img src="{{ img_c.presigned_url }}" alt="{{ img_c.caption|default:'Image contribution' }}" class="w-full h-48 object-cover rounded-md mb-2">
+                                {% else %}
+                                    <div class="w-full h-48 bg-gray-200 flex items-center justify-center rounded-md mb-2 text-gray-500">No Image Preview</div>
+                                {% endif %}
+                                <p class="text-gray-800 text-lg">{{ img_c.caption }}</p>
+                                <p class="text-xs text-gray-500 mt-1">Contributed: {{ img_c.created_at|date:"M j, Y H:i" }}</p>
+                                <p class="text-xs text-gray-500">Status: <span class="font-semibold text-blue-600">{{ img_c.get_status_display }}</span></p>
+                            </li>
+                        {% endfor %}
 
-                    {# UPDATED: Existing Video Contributions - now handles YouTube embeds #}
-                    {% if existing_video_contributions %}
-                        <div class="mb-6">
-                            <h4 class="text-xl font-medium text-gray-700 mb-3">Videos</h4>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {% for contribution in existing_video_contributions %}
-                                    <div class="bg-gray-100 rounded-md overflow-hidden shadow-sm">
-                                        {% if contribution.youtube_video_id %}
-                                            {# Embed YouTube video using iframe #}
-                                            <div class="relative" style="padding-bottom: 56.25%; height: 0; overflow: hidden;">
-                                                <iframe class="absolute top-0 left-0 w-full h-full" 
-                                                        src="https://www.youtube.com/embed/{{ contribution.youtube_video_id }}?rel=0" 
-                                                        frameborder="0" 
-                                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                                        allowfullscreen>
-                                                </iframe>
-                                            </div>
-                                        {% elif contribution.video %}
-                                            {# Display uploaded video file #}
-                                            <video controls class="w-full h-48 object-cover">
-                                                <source src="{{ contribution.video.url }}" type="video/mp4"> {# Assuming MP4, adjust type if needed #}
-                                                Your browser does not support the video tag.
-                                            </video>
-                                        {% else %}
-                                            <div class="p-3 text-gray-600">No video content found.</div>
-                                        {% endif %}
-                                        <div class="p-3">
-                                            {% if contribution.caption %}<p class="text-gray-800 font-medium">{{ contribution.caption }}</p>{% endif %}
-                                            <p class="text-xs text-gray-500 mt-1">{{ contribution.created_at|date:"M j, Y H:i" }}</p>
-                                        </div>
+                        {% for vid_c in existing_video_contributions %}
+                            <li class="bg-gray-50 p-4 rounded-lg shadow-sm">
+                                {% if vid_c.youtube_video_id %}
+                                    <div class="relative" style="padding-bottom: 56.25%;">
+                                        <iframe class="absolute top-0 left-0 w-full h-full rounded-md" src="https://www.youtube.com/embed/{{ vid_c.youtube_video_id }}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
                                     </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    {% endif %}
+                                {% elif vid_c.presigned_url %} {# Use presigned_url here #}
+                                    <video controls class="w-full h-48 object-cover rounded-md mb-2">
+                                        <source src="{{ vid_c.presigned_url }}" type="video/mp4"> {# Assuming MP4 #}
+                                        Your browser does not support the video tag.
+                                    </video>
+                                {% else %}
+                                    <div class="w-full h-48 bg-gray-200 flex items-center justify-center rounded-md mb-2 text-gray-500">No Video Preview</div>
+                                {% endif %}
+                                <p class="text-gray-800 text-lg">{{ vid_c.caption }}</p>
+                                <p class="text-xs text-gray-500 mt-1">Contributed: {{ vid_c.created_at|date:"M j, Y H:i" }}</p>
+                                <p class="text-xs text-gray-500">Status: <span class="font-semibold text-blue-600">{{ vid_c.get_status_display }}</span></p>
+                            </li>
+                        {% endfor %}
+                    </ul>
                 {% else %}
-                    <p class="text-gray-600 text-lg text-center py-4">You haven't added any contributions to this story yet.</p>
+                    <p class="text-center text-gray-600 text-lg">You haven't added any contributions yet.</p>
                 {% endif %}
             </div>
-
-            <div class="text-center mt-8 pt-6 border-t border-gray-200">
-                <a href="{% url 'home' %}" class="font-medium text-indigo-600 hover:text-indigo-500">Back to Home</a>
-            </div>
-        {% endif %} {# End of if not expired #}
+        {% endif %} {# End if not expired #}
     </div>
 </div>
-{% endblock %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active classes
+                tabButtons.forEach(btn => btn.classList.remove('active-tab', 'border-indigo-500', 'text-indigo-600'));
+                tabContents.forEach(content => content.classList.add('hidden'));
+
+                // Add active classes to clicked button
+                button.classList.add('active-tab', 'border-indigo-500', 'text-indigo-600');
+                
+                // Show corresponding content
+                const targetTab = document.getElementById(button.dataset.tab);
+                if (targetTab) {
+                    targetTab.classList.remove('hidden');
+                }
+            });
+        });
+
+        // Set initial active tab
+        const initialActiveButton = document.querySelector('.tab-button.active-tab');
+        if (initialActiveButton) {
+            initialActiveButton.click(); // Simulate click to set initial state
+        } else if (tabButtons.length > 0) {
+            tabButtons[0].click(); // Fallback to first tab if no active-tab class is set
+        }
+    });
+</script>
+{% endblock content %}

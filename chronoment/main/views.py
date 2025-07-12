@@ -36,6 +36,9 @@ from itertools import chain
 from django.db import models
 import json # <--- NEW: Import json module
 from django.core.serializers.json import DjangoJSONEncoder
+from datetime import datetime, time
+import boto3 # <-- ADD THIS IMPORT
+from botocore.exceptions import ClientError
 # Create your views here.
 
 def index(response,id):
@@ -50,9 +53,9 @@ def user(response,id):
     return render(response, "main/user.html",{"us":us})
 
 
-def _check_and_update_story_sender_status(story_sender):
+def _check_and_update_story_sender_status(request, story_sender):
     """
-    Checks if all contributions for a given StorySender are approved.
+    Checks if all contributions for a given StorySender are approved or ignored.
     If so, updates the StorySender's invitation_status to 'accepted'.
     """
     # Get all contributions associated with this StorySender
@@ -60,27 +63,37 @@ def _check_and_update_story_sender_status(story_sender):
     all_image_contributions = ImageContribution.objects.filter(story_sender=story_sender)
     all_video_contributions = VideoContribution.objects.filter(story_sender=story_sender)
 
-    # Combine all contributions into a single list (or just check counts)
+    # Combine all contributions into a single list
     all_contributions = list(all_text_contributions) + list(all_image_contributions) + list(all_video_contributions)
 
     # If there are no contributions, the status should not become 'accepted'
+    # It should remain 'pending' if no contributions were ever made, or 'contributed' if some were made and then deleted.
+    # We only update to 'accepted' if there are contributions AND all are reviewed.
     if not all_contributions:
+        # If a sender had contributions that were all deleted, their status might need to revert from 'contributed'
+        # to 'pending'. This is a more complex edge case, for now, we'll let it stay 'contributed' if it was.
+        # If it's 'accepted' and all contributions are gone, it should revert.
+        if story_sender.invitation_status == 'accepted':
+            story_sender.invitation_status = 'contributed' # Or 'pending' depending on desired behavior for empty.
+            story_sender.save()
+            messages.info(request, f"All contributions from {story_sender.sender.name or story_sender.sender.email} for '{story_sender.story.title}' have been removed. Status reverted to 'Contributed'.")
         return
 
-    # Check if ALL contributions are approved
-    all_approved = all(c.is_approved for c in all_contributions)
 
-    if all_approved and story_sender.invitation_status != 'accepted':
+    # CHANGED: Check if ALL contributions have status 'approved' OR 'ignored'
+    all_reviewed = all(c.status == 'approved' or c.status == 'ignored' for c in all_contributions)
+
+    if all_reviewed and story_sender.invitation_status != 'accepted':
         story_sender.invitation_status = 'accepted'
         story_sender.save()
-        messages.info(None, f"All contributions from {story_sender.sender.name or story_sender.sender.email} for '{story_sender.story.title}' have been approved. Status updated to 'Accepted'.")
-    elif not all_approved and story_sender.invitation_status == 'accepted':
-        # This case handles if a previously approved contribution is somehow unapproved
-        # or if a new unapproved contribution is added after all others were approved.
-        # Revert status back to 'contributed' if not all are approved anymore.
+        messages.info(request, f"All contributions from {story_sender.sender.name or story_sender.sender.email} for '{story_sender.story.title}' have been reviewed (approved or ignored). Status updated to 'Accepted'.")
+    elif not all_reviewed and story_sender.invitation_status == 'accepted':
+        # This case handles if a previously reviewed contribution is changed back to 'pending',
+        # or if a new 'pending' contribution is added after all others were reviewed.
+        # Revert status back to 'contributed' if not all are reviewed anymore.
         story_sender.invitation_status = 'contributed'
         story_sender.save()
-        messages.info(None, f"Not all contributions from {story_sender.sender.name or story_sender.sender.email} for '{story_sender.story.title}' are approved. Status reverted to 'Contributed'.")
+        messages.info(request, f"Not all contributions from {story_sender.sender.name or story_sender.sender.email} for '{story_sender.story.title}' have been reviewed. Status reverted to 'Contributed'.")
 
 
 def signup(response):
@@ -251,22 +264,15 @@ def send_invitation_email(sender_email, sender_name, story_title, invitation_lin
 def manage_senders_for_story(request, story_id):
     story = get_object_or_404(Stories, id=story_id, organiser=request.user)
     
-    # Fetch existing StorySenders for this story
     existing_story_senders = StorySenders.objects.filter(story=story).order_by('sender__email')
     existing_senders_count = existing_story_senders.count()
 
-    # Calculate remaining slots
     remaining_slots = max(0, story.max_senders - existing_senders_count)
     
-    # Determine how many extra forms to display initially
-    # We want to show a few (e.g., 3) empty forms, but not more than remaining_slots
-    initial_extra_forms = min(3, remaining_slots) 
-
-    # Dynamically create the SenderFormSet
     DynamicSenderFormSet = formset_factory(
         SenderForm, 
-        extra=initial_extra_forms, 
-        max_num=remaining_slots, # Set max_num to the actual remaining slots
+        extra=0,
+        max_num=remaining_slots,
         validate_max=True
     )
 
@@ -275,34 +281,36 @@ def manage_senders_for_story(request, story_id):
 
         if action == 'add_new_senders':
             formset = DynamicSenderFormSet(request.POST, prefix='senders')
-            if formset.is_valid():
+            if formset.is_valid(): # This checks overall formset validity
                 senders_added_count = 0
                 for form in formset:
-                    if form.cleaned_data: # Only process forms with data
+                    # IMPORTANT: Check individual form validity *before* accessing cleaned_data
+                    if form.is_valid(): # Check if this specific form in the formset is valid
                         email = form.cleaned_data['email']
-                        name = form.cleaned_data.get('name', '')
+                        name = form.cleaned_data['name'] 
 
-                        # Server-side check for max_senders limit before adding
                         if existing_senders_count + senders_added_count >= story.max_senders:
                             messages.error(request, f"Cannot add more senders. Maximum limit of {story.max_senders} reached for this story.")
-                            # Break the loop and redirect, or continue to show errors for forms that would exceed limit
-                            break # Exit loop if limit reached
+                            break 
 
                         sender, created = Senders.objects.get_or_create(
                             email=email,
-                            defaults={'name': name} # Set name only if creating new sender
+                            defaults={'name': name} 
                         )
-                        if not created and name and sender.name != name:
+                        
+                        if not created and sender.name != name:
                             sender.name = name
                             sender.save()
+                            messages.info(request, f"Updated name for existing sender '{email}'.")
 
-                        # Prevent duplicate invitations for the same story
                         if StorySenders.objects.filter(story=story, sender=sender).exists():
-                            messages.warning(request, f"Sender '{email}' is already invited to this story.")
+                            messages.warning(request, f"Sender '{email}' is already invited to THIS story ('{story.title}').")
                             continue
 
                         invitation_token = uuid.uuid4().hex
-                        token_expires_at = timezone.now() + timezone.timedelta(days=7) 
+                        token_expires_at = timezone.make_aware(timezone.datetime(
+                            story.reveal_date.year, story.reveal_date.month, story.reveal_date.day, 23, 59, 59
+                        ))
 
                         StorySenders.objects.create(
                             story=story,
@@ -313,25 +321,49 @@ def manage_senders_for_story(request, story_id):
                         )
 
                         invitation_link = request.build_absolute_uri(
-                            reverse('join_story_by_token', args=[invitation_token])
+                            reverse('join_story_by_token', args=[invitation_token]) 
                         )
 
                         if send_invitation_email(email, name, story.title, invitation_link):
-                            messages.success(request, f"Invitation sent to {email}.")
                             senders_added_count += 1
                         else:
                             messages.error(request, f"Failed to send invitation email to {email}.")
+                    else:
+                        # If an individual form is NOT valid, we should not proceed with it.
+                        # The errors will be displayed by the template when it's re-rendered.
+                        # We can add a message here if we want a general one, but specific field errors are better.
+                        # For now, just continue to the next form or exit the loop if no valid forms.
+                        messages.error(request, "One or more sender forms had validation errors. Please check the fields below.")
+                        # This break is important: if the formset is not valid, we shouldn't try to process
+                        # further forms, as it means the whole submission has issues.
+                        break # Exit the loop if an invalid form is found
                 
                 if senders_added_count > 0:
                     messages.success(request, f"Successfully added and invited {senders_added_count} new sender(s).")
                 else:
-                    messages.info(request, "No new senders were added or all were duplicates.")
+                    # Only show this if no senders were added and there were no other specific errors
+                    if not formset.errors: # Check if the formset itself has no non-form errors
+                        messages.info(request, "No new senders were added or all were duplicates for the current story.")
                 
-                # Redirect to the same page to show updated list and clear form
                 return redirect(reverse('manage_senders_for_story', args=[story.id]))
             else:
-                messages.error(request, "Please correct errors in the new sender forms.")
+                # If the overall formset is NOT valid, re-render the page with errors
+                for form_idx, form in enumerate(formset):
+                    if form.errors:
+                        for field, errors in form.errors.items():
+                            for error in errors:
+                                messages.error(request, f"Error in Sender #{form_idx + 1} ({field}): {error}")
+                messages.error(request, "Please correct the errors below to invite new senders.")
+                context = {
+                    'story': story,
+                    'formset': formset, 
+                    'existing_story_senders': existing_story_senders, 
+                    'remaining_slots': remaining_slots, 
+                    'page_title': f"Manage Senders for '{story.title}'"
+                }
+                return render(request, 'main/manage_senders_for_story.html', context)
         
+        # ... (rest of the view for delete_sender, resend_invite, etc.)
         elif action == 'delete_sender':
             story_sender_id = request.POST.get('story_sender_id')
             if story_sender_id:
@@ -342,7 +374,7 @@ def manage_senders_for_story(request, story_id):
                     messages.success(request, f"Sender '{email_to_delete}' has been removed from this story.")
                 except Exception as e:
                     messages.error(request, f"Error removing sender: {e}")
-            return redirect(reverse('manage_senders_for_story', args=[story.id]))
+            return redirect(request.META.get('HTTP_REFERER', reverse('home')))
 
         elif action == 'resend_invite':
             story_sender_id = request.POST.get('story_sender_id')
@@ -350,10 +382,11 @@ def manage_senders_for_story(request, story_id):
                 try:
                     story_sender = get_object_or_404(StorySenders, id=story_sender_id, story=story)
                     
-                    # Generate new token and update expiration
                     story_sender.invitation_token = uuid.uuid4().hex
-                    story_sender.token_expires_at = timezone.now() + timezone.timedelta(days=7)
-                    story_sender.invitation_status = 'pending' # Reset status to pending if it was accepted/used
+                    token_expires_at = timezone.make_aware(timezone.datetime(
+                        story.reveal_date.year, story.reveal_date.month, story.reveal_date.day, 23, 59, 59
+                    ))
+                    story_sender.invitation_status = 'pending' 
                     story_sender.save()
 
                     invitation_link = request.build_absolute_uri(
@@ -374,13 +407,12 @@ def manage_senders_for_story(request, story_id):
 
     context = {
         'story': story,
-        'formset': formset, # For adding new senders
-        'existing_story_senders': existing_story_senders, # For displaying existing senders
-        'remaining_slots': remaining_slots, # Pass remaining slots to the template
+        'formset': formset, 
+        'existing_story_senders': existing_story_senders, 
+        'remaining_slots': remaining_slots, 
         'page_title': f"Manage Senders for '{story.title}'"
     }
     return render(request, 'main/manage_senders_for_story.html', context)
-
 
 
 @login_required
@@ -412,13 +444,11 @@ def join_story_by_token(request, token):
         messages.error(request, "Invalid or missing invitation token.")
         return redirect(reverse('home'))
 
-    # Check if the token has expired
     if story_sender.token_expires_at and timezone.now() > story_sender.token_expires_at:
         messages.error(request, "This invitation link has expired.")
         story_sender.invitation_status = 'expired'
         story_sender.save()
-        # Render the template with an 'expired' flag to show appropriate message
-        return render(request, 'your_app_name/join_story_by_token.html', {
+        return render(request, 'main/join_story_by_token.html', {
             'page_title': 'Invitation Expired',
             'expired': True,
             'story_sender': story_sender,
@@ -429,10 +459,9 @@ def join_story_by_token(request, token):
     story = story_sender.story
     sender = story_sender.sender
 
-    # Initialize forms for GET request or if POST fails validation
     text_form = TextContributionForm()
     image_form = ImageContributionForm()
-    video_form = VideoContributionForm() # Use the updated form
+    video_form = VideoContributionForm()
 
     if request.method == 'POST':
         contribution_type = request.POST.get('contribution_type')
@@ -444,7 +473,7 @@ def join_story_by_token(request, token):
                 contribution.story_sender = story_sender
                 contribution.save()
                 messages.success(request, "Your message has been added to the story!")
-                story_sender.invitation_status = 'contributed' # Update status
+                story_sender.invitation_status = 'contributed'
                 story_sender.save()
                 return redirect(reverse('join_story_by_token', args=[token]))
             else:
@@ -455,43 +484,106 @@ def join_story_by_token(request, token):
             if image_form.is_valid():
                 contribution = image_form.save(commit=False)
                 contribution.story_sender = story_sender
-                contribution.save()
-                messages.success(request, "Your image has been added to the story!")
-                story_sender.invitation_status = 'contributed' # Update status
-                story_sender.save()
-                return redirect(reverse('join_story_by_token', args=[token]))
+                
+                # --- DEBUGGING START: Image Upload ---
+                print(f"DEBUG: Attempting to save image contribution for sender {story_sender.sender.email}")
+                print(f"DEBUG: Image file received: {contribution.image.name if contribution.image else 'None'}")
+                print(f"DEBUG: Image file size: {contribution.image.size if contribution.image else 'N/A'} bytes")
+                try:
+                    contribution.save() # This is where django-storages attempts to upload
+                    print(f"DEBUG: Image contribution saved successfully. File path: {contribution.image.name}")
+                    messages.success(request, "Your image has been added to the story!")
+                    story_sender.invitation_status = 'contributed'
+                    story_sender.save()
+                    return redirect(reverse('join_story_by_token', args=[token]))
+                except Exception as e:
+                    print(f"ERROR: Exception during image upload: {e}")
+                    import traceback
+                    traceback.print_exc() # Print full traceback
+                    messages.error(request, f"Failed to upload image: {e}")
+                    # If upload fails, re-render the page with the form and error
+                    context = {
+                        'story_sender': story_sender,
+                        'story': story,
+                        'sender': sender,
+                        'text_form': text_form,
+                        'image_form': image_form, # Pass back the form with errors
+                        'video_form': video_form,
+                        'existing_text_contributions': TextContribution.objects.filter(story_sender=story_sender).order_by('-created_at'),
+                        'existing_image_contributions': [], # No need to pre-sign if there's an error
+                        'existing_video_contributions': [],
+                        'page_title': f"Contribute to '{story.title}'"
+                    }
+                    return render(request, 'main/join_story_by_token.html', context)
+                # --- DEBUGGING END: Image Upload ---
             else:
                 messages.error(request, "Please correct the errors in your image upload.")
 
         elif contribution_type == 'video':
-            # Instantiate with request.POST for URL and caption, request.FILES for the file
             video_form = VideoContributionForm(request.POST, request.FILES)
             if video_form.is_valid():
-                # The form's clean method has already set youtube_video_id and cleared 'video' if needed
                 contribution = video_form.save(commit=False) 
                 contribution.story_sender = story_sender
-                
-                # --- EXPLICIT ASSIGNMENT FIX ---
-                # This line ensures the youtube_video_id from cleaned_data is explicitly set
-                # on the model instance before saving.
                 if 'youtube_video_id' in video_form.cleaned_data:
                     contribution.youtube_video_id = video_form.cleaned_data['youtube_video_id']
-                # --- END EXPLICIT ASSIGNMENT FIX ---
-
-                contribution.save() 
-                messages.success(request, "Your video has been added to the story!")
-                story_sender.invitation_status = 'contributed' # Update status
-                story_sender.save()
-                return redirect(reverse('join_story_by_token', args=[token]))
+                
+                # --- DEBUGGING START: Video Upload ---
+                print(f"DEBUG: Attempting to save video contribution for sender {story_sender.sender.email}")
+                print(f"DEBUG: Video file received: {contribution.video.name if contribution.video else 'None'}")
+                print(f"DEBUG: Video file size: {contribution.video.size if contribution.video else 'N/A'} bytes")
+                try:
+                    contribution.save() # This is where django-storages attempts to upload
+                    print(f"DEBUG: Video contribution saved successfully. File path: {contribution.video.name}")
+                    messages.success(request, "Your video has been added to the story!")
+                    story_sender.invitation_status = 'contributed'
+                    story_sender.save()
+                    return redirect(reverse('join_story_by_token', args=[token]))
+                except Exception as e:
+                    print(f"ERROR: Exception during video upload: {e}")
+                    import traceback
+                    traceback.print_exc() # Print full traceback
+                    messages.error(request, f"Failed to upload video: {e}")
+                    # If upload fails, re-render the page with the form and error
+                    context = {
+                        'story_sender': story_sender,
+                        'story': story,
+                        'sender': sender,
+                        'text_form': text_form,
+                        'image_form': image_form,
+                        'video_form': video_form, # Pass back the form with errors
+                        'existing_text_contributions': TextContribution.objects.filter(story_sender=story_sender).order_by('-created_at'),
+                        'existing_image_contributions': [],
+                        'existing_video_contributions': [], # No need to pre-sign if there's an error
+                        'page_title': f"Contribute to '{story.title}'"
+                    }
+                    return render(request, 'your_app_name/join_story_by_token.html', context)
+                # --- DEBUGGING END: Video Upload ---
             else:
                 messages.error(request, "Please correct the errors in your video submission.")
         else:
             messages.error(request, "Invalid contribution type.")
 
+    # ... (rest of join_story_by_token, including fetching existing contributions for GET request)
     # Fetch existing contributions for display by this specific sender to this story
     existing_text_contributions = TextContribution.objects.filter(story_sender=story_sender).order_by('-created_at')
-    existing_image_contributions = ImageContribution.objects.filter(story_sender=story_sender).order_by('-created_at')
-    existing_video_contributions = VideoContribution.objects.filter(story_sender=story_sender).order_by('-created_at')
+    
+    # --- UPDATED: Generate pre-signed URLs for images ---
+    existing_image_contributions_with_urls = []
+    for img_c in ImageContribution.objects.filter(story_sender=story_sender).order_by('-created_at'):
+        if img_c.image: # Check if image file exists
+            img_url = generate_presigned_url(img_c.image.name) # Use .name to get the S3 key
+            if img_url:
+                img_c.presigned_url = img_url # Add a new attribute to the object
+        existing_image_contributions_with_urls.append(img_c)
+
+    # --- UPDATED: Generate pre-signed URLs for videos ---
+    existing_video_contributions_with_urls = []
+    for vid_c in VideoContribution.objects.filter(story_sender=story_sender).order_by('-created_at'):
+        if vid_c.video: # Check if video file exists
+            vid_url = generate_presigned_url(vid_c.video.name) # Use .name to get the S3 key
+            if vid_url:
+                vid_c.presigned_url = vid_url # Add a new attribute to the object
+        existing_video_contributions_with_urls.append(vid_c)
 
     context = {
         'story_sender': story_sender,
@@ -499,10 +591,10 @@ def join_story_by_token(request, token):
         'sender': sender,
         'text_form': text_form,
         'image_form': image_form,
-        'video_form': video_form, # Pass the updated form
+        'video_form': video_form,
         'existing_text_contributions': existing_text_contributions,
-        'existing_image_contributions': existing_image_contributions,
-        'existing_video_contributions': existing_video_contributions,
+        'existing_image_contributions': existing_image_contributions_with_urls, # Pass the updated list
+        'existing_video_contributions': existing_video_contributions_with_urls, # Pass the updated list
         'page_title': f"Contribute to '{story.title}'"
     }
     return render(request, 'main/join_story_by_token.html', context)
@@ -584,7 +676,12 @@ def view_story_by_topper(request, topper_identifier):
         messages.error(request, "No story found for this topper code.")
         return redirect(reverse('home'))
 
-    if story.reveal_date > timezone.now().date():
+    # Convert story.reveal_date to a timezone-aware datetime at the start of that day
+    reveal_datetime_start = timezone.make_aware(
+        datetime.combine(story.reveal_date, time(0, 0, 0))
+    )
+
+    if reveal_datetime_start > timezone.now():
         messages.warning(request, "This story has not been revealed yet. Please check back on the reveal date.")
         if request.user.is_authenticated and request.user == story.organiser:
             return redirect(reverse('story_detail', args=[story.id]))
@@ -593,10 +690,12 @@ def view_story_by_topper(request, topper_identifier):
     # Fetch all APPROVED contributions for this story
     story_senders_for_story = StorySenders.objects.filter(story=story)
 
+    processed_contributions = []
+
     # Fetch and prepare text contributions
     text_contributions = TextContribution.objects.filter(
         story_sender__in=story_senders_for_story,
-        is_approved=True
+        status='approved' 
     ).annotate(
         contributor_name=models.Case(
             models.When(story_sender__sender__name__isnull=False, then=models.F('story_sender__sender__name')),
@@ -608,74 +707,40 @@ def view_story_by_topper(request, topper_identifier):
     ).annotate(
         type=models.Value('text', output_field=models.CharField())
     )
-
-    # Fetch and prepare image contributions - CRITICAL: Use .url for image field
-    image_contributions = ImageContribution.objects.filter(
-        story_sender__in=story_senders_for_story,
-        is_approved=True
-    ).annotate(
-        contributor_name=models.Case(
-            models.When(story_sender__sender__name__isnull=False, then=models.F('story_sender__sender__name')),
-            default=models.F('story_sender__sender__email'),
-            output_field=models.CharField()
-        )
-    ).values(
-        'id', 'caption', 'created_at', 'contributor_name'
-    ).annotate(
-        # Manually add the image URL using F() expression if possible, or iterate later
-        # For simplicity and direct JSON serialization, we'll get the object and process it.
-        # This requires fetching full objects, not just values.
-        type=models.Value('image', output_field=models.CharField())
-    )
-
-    # Fetch and prepare video contributions - CRITICAL: Use .url for video field
-    video_contributions = VideoContribution.objects.filter(
-        story_sender__in=story_senders_for_story,
-        is_approved=True
-    ).annotate(
-        contributor_name=models.Case(
-            models.When(story_sender__sender__name__isnull=False, then=models.F('story_sender__sender__name')),
-            default=models.F('story_sender__sender__email'),
-            output_field=models.CharField()
-        )
-    ).values(
-        'id', 'youtube_url', 'youtube_video_id', 'caption', 'created_at', 'contributor_name'
-    ).annotate(
-        # Manually add the video URL using F() expression if possible, or iterate later
-        # This also requires fetching full objects, not just values.
-        type=models.Value('video', output_field=models.CharField())
-    )
-
-    # To get the .url for File/ImageFields, we need to fetch the full objects
-    # and then manually convert them to dictionaries with the correct URLs.
-    processed_contributions = []
-
     for text_c in text_contributions:
         processed_contributions.append(text_c)
     
-    # Process Image Contributions
+    # Process Image Contributions - Generate pre-signed URLs here
     for img_c in ImageContribution.objects.filter(
         story_sender__in=story_senders_for_story,
-        is_approved=True
-    ).select_related('story_sender__sender'): # Select related to avoid N+1 queries
+        status='approved' 
+    ).select_related('story_sender__sender'):
+        presigned_img_url = None
+        if img_c.image:
+            presigned_img_url = generate_presigned_url(img_c.image.name) # <-- Generate pre-signed URL
+        
         processed_contributions.append({
             'id': img_c.id,
             'type': 'image',
-            'image': img_c.image.url if img_c.image else None, # Get the URL here
+            'image_url': presigned_img_url, # <-- Use the pre-signed URL
             'caption': img_c.caption,
             'created_at': img_c.created_at,
             'contributor_name': img_c.story_sender.sender.name if img_c.story_sender.sender.name else img_c.story_sender.sender.email,
         })
 
-    # Process Video Contributions
+    # Process Video Contributions - Generate pre-signed URLs here
     for vid_c in VideoContribution.objects.filter(
         story_sender__in=story_senders_for_story,
-        is_approved=True
-    ).select_related('story_sender__sender'): # Select related to avoid N+1 queries
+        status='approved' 
+    ).select_related('story_sender__sender'):
+        presigned_video_url = None
+        if vid_c.video:
+            presigned_video_url = generate_presigned_url(vid_c.video.name) # <-- Generate pre-signed URL
+        
         processed_contributions.append({
             'id': vid_c.id,
             'type': 'video',
-            'video': vid_c.video.url if vid_c.video else None, # Get the URL here
+            'video_url': presigned_video_url, # <-- Use the pre-signed URL
             'youtube_url': vid_c.youtube_url,
             'youtube_video_id': vid_c.youtube_video_id,
             'caption': vid_c.caption,
@@ -689,15 +754,15 @@ def view_story_by_topper(request, topper_identifier):
         key=lambda x: x['created_at']
     )
     
-    # Serialize the contributions list to JSON using Django's encoder
     json_contributions = json.dumps(list(all_contributions_sorted), cls=DjangoJSONEncoder)
 
     context = {
         'story': story,
-        'contributions': json_contributions, # Pass the JSON string
+        'contributions': json_contributions, 
         'page_title': f"Story Slideshow: {story.title}"
     }
-    return render(request, 'main/story_slideshow.html', context) # Render new slideshow template
+    return render(request, 'main/story_slideshow.html', context)
+
 
 # Original view_revealed_story (now potentially redundant if view_story_by_topper is the primary public view)
 # You can remove this or keep it if you foresee another use case for direct story_id access
@@ -746,32 +811,38 @@ def view_revealed_story(request, story_id):
 
 @login_required
 def view_sender_contributions(request, story_id, story_sender_id):
-    # Ensure the story belongs to the current organiser
     story = get_object_or_404(Stories, id=story_id, organiser=request.user)
-    
-    # Ensure the story_sender is linked to this story
     story_sender = get_object_or_404(StorySenders, id=story_sender_id, story=story)
 
-    # Fetch all contributions for this specific StorySender
     text_contributions = TextContribution.objects.filter(
         story_sender=story_sender
     ).order_by('created_at')
 
-    image_contributions = ImageContribution.objects.filter(
-        story_sender=story_sender
-    ).order_by('created_at')
+    # --- UPDATED: Generate pre-signed URLs for images ---
+    image_contributions_with_urls = []
+    for img_c in ImageContribution.objects.filter(story_sender=story_sender).order_by('created_at'):
+        if img_c.image:
+            img_url = generate_presigned_url(img_c.image.name)
+            if img_url:
+                img_c.presigned_url = img_url
+        image_contributions_with_urls.append(img_c)
 
-    video_contributions = VideoContribution.objects.filter(
-        story_sender=story_sender
-    ).order_by('created_at')
+    # --- UPDATED: Generate pre-signed URLs for videos ---
+    video_contributions_with_urls = []
+    for vid_c in VideoContribution.objects.filter(story_sender=story_sender).order_by('created_at'):
+        if vid_c.video:
+            vid_url = generate_presigned_url(vid_c.video.name)
+            if vid_url:
+                vid_c.presigned_url = vid_url
+        video_contributions_with_urls.append(vid_c)
 
     context = {
         'story': story,
         'story_sender': story_sender,
         'sender_name': story_sender.sender.name if story_sender.sender.name else story_sender.sender.email,
         'text_contributions': text_contributions,
-        'image_contributions': image_contributions,
-        'video_contributions': video_contributions,
+        'image_contributions': image_contributions_with_urls, # Pass the updated list
+        'video_contributions': video_contributions_with_urls, # Pass the updated list
         'page_title': f"Contributions by {story_sender.sender.name or story_sender.sender.email} for '{story.title}'"
     }
     return render(request, 'main/sender_contributions.html', context)
@@ -783,10 +854,11 @@ def approve_text_contribution(request, pk):
     if request.method == 'POST':
         contribution = get_object_or_404(TextContribution, pk=pk)
         if request.user == contribution.story_sender.story.organiser:
-            contribution.is_approved = True
+            # CHANGED: Set status to 'approved'
+            contribution.status = 'approved'
             contribution.save()
             messages.success(request, "Text contribution approved successfully.")
-            _check_and_update_story_sender_status(contribution.story_sender) # Call helper
+            _check_and_update_story_sender_status(request, contribution.story_sender) 
         else:
             messages.error(request, "You are not authorized to approve this contribution.")
     return redirect(request.META.get('HTTP_REFERER', reverse('home')))
@@ -797,10 +869,11 @@ def approve_image_contribution(request, pk):
     if request.method == 'POST':
         contribution = get_object_or_404(ImageContribution, pk=pk)
         if request.user == contribution.story_sender.story.organiser:
-            contribution.is_approved = True
+            # CHANGED: Set status to 'approved'
+            contribution.status = 'approved'
             contribution.save()
             messages.success(request, "Image contribution approved successfully.")
-            _check_and_update_story_sender_status(contribution.story_sender) # Call helper
+            _check_and_update_story_sender_status(request, contribution.story_sender)
         else:
             messages.error(request, "You are not authorized to approve this contribution.")
     return redirect(request.META.get('HTTP_REFERER', reverse('home')))
@@ -811,24 +884,71 @@ def approve_video_contribution(request, pk):
     if request.method == 'POST':
         contribution = get_object_or_404(VideoContribution, pk=pk)
         if request.user == contribution.story_sender.story.organiser:
-            contribution.is_approved = True
+            # CHANGED: Set status to 'approved'
+            contribution.status = 'approved'
             contribution.save()
             messages.success(request, "Video contribution approved successfully.")
-            _check_and_update_story_sender_status(contribution.story_sender) # Call helper
+            _check_and_update_story_sender_status(request, contribution.story_sender)
         else:
             messages.error(request, "You are not authorized to approve this contribution.")
     return redirect(request.META.get('HTTP_REFERER', reverse('home')))
+
+# NEW: View to handle ignoring a text contribution
+@login_required
+def ignore_text_contribution(request, pk):
+    if request.method == 'POST':
+        contribution = get_object_or_404(TextContribution, pk=pk)
+        if request.user == contribution.story_sender.story.organiser:
+            # NEW: Set status to 'ignored'
+            contribution.status = 'ignored'
+            contribution.save()
+            messages.info(request, "Text contribution marked as ignored.")
+            _check_and_update_story_sender_status(request, contribution.story_sender) 
+        else:
+            messages.error(request, "You are not authorized to ignore this contribution.")
+    return redirect(request.META.get('HTTP_REFERER', reverse('home')))
+
+# NEW: View to handle ignoring an image contribution
+@login_required
+def ignore_image_contribution(request, pk):
+    if request.method == 'POST':
+        contribution = get_object_or_404(ImageContribution, pk=pk)
+        if request.user == contribution.story_sender.story.organiser:
+            # NEW: Set status to 'ignored'
+            contribution.status = 'ignored'
+            contribution.save()
+            messages.info(request, "Image contribution marked as ignored.")
+            _check_and_update_story_sender_status(request, contribution.story_sender)
+        else:
+            messages.error(request, "You are not authorized to ignore this contribution.")
+    return redirect(request.META.get('HTTP_REFERER', reverse('home')))
+
+# NEW: View to handle ignoring a video contribution
+@login_required
+def ignore_video_contribution(request, pk):
+    if request.method == 'POST':
+        contribution = get_object_or_404(VideoContribution, pk=pk)
+        if request.user == contribution.story_sender.story.organiser:
+            # NEW: Set status to 'ignored'
+            contribution.status = 'ignored'
+            contribution.save()
+            messages.info(request, "Video contribution marked as ignored.")
+            _check_and_update_story_sender_status(request, contribution.story_sender)
+        else:
+            messages.error(request, "You are not authorized to ignore this contribution.")
+    return redirect(request.META.get('HTTP_REFERER', reverse('home')))
+
 
 # NEW: View to handle deletion of a text contribution
 @login_required
 def delete_text_contribution(request, pk):
     if request.method == 'POST':
-        contribution = get_object_or_404(TextContribution, pk=pk)
+        contribution = get_object_or_404(TextContribution, pk=pk) 
         story_sender = contribution.story_sender # Get story_sender before deleting contribution
         if request.user == story_sender.story.organiser:
             contribution.delete()
             messages.success(request, "Text contribution deleted successfully.")
-            _check_and_update_story_sender_status(story_sender) # Call helper after deletion
+            _check_and_update_story_sender_status(request, story_sender)
         else:
             messages.error(request, "You are not authorized to delete this contribution.")
     return redirect(request.META.get('HTTP_REFERER', reverse('home')))
@@ -842,7 +962,7 @@ def delete_image_contribution(request, pk):
         if request.user == story_sender.story.organiser:
             contribution.delete()
             messages.success(request, "Image contribution deleted successfully.")
-            _check_and_update_story_sender_status(story_sender) # Call helper after deletion
+            _check_and_update_story_sender_status(request, story_sender)
         else:
             messages.error(request, "You are not authorized to delete this contribution.")
     return redirect(request.META.get('HTTP_REFERER', reverse('home')))
@@ -856,11 +976,10 @@ def delete_video_contribution(request, pk):
         if request.user == story_sender.story.organiser:
             contribution.delete()
             messages.success(request, "Video contribution deleted successfully.")
-            _check_and_update_story_sender_status(story_sender) # Call helper after deletion
+            _check_and_update_story_sender_status(request, story_sender)
         else:
             messages.error(request, "You are not authorized to delete this contribution.")
     return redirect(request.META.get('HTTP_REFERER', reverse('home')))
-
 
 def learn_more_page(request):
     """
@@ -870,6 +989,32 @@ def learn_more_page(request):
         'page_title': 'Learn More about Chronoment'
     }
     return render(request, 'main/learn_more.html', context)
+
+
+def generate_presigned_url(file_path, expiration=3600): # Default expiration 1 hour (3600 seconds)
+    """
+    Generate a pre-signed URL to share an S3 object.
+    :param file_path: The object's key (path) in the S3 bucket.
+                      e.g., 'media/images/my_image.jpg'
+    :param expiration: The time in seconds for the pre-signed URL to be valid.
+    :return: The pre-signed URL as a string.
+    """
+    s3_client = boto3.client(
+        's3',
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        region_name=settings.AWS_S3_REGION_NAME
+    )
+    try:
+        response = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': settings.AWS_STORAGE_BUCKET_NAME, 'Key': file_path},
+            ExpiresIn=expiration
+        )
+    except ClientError as e:
+        print(f"Error generating pre-signed URL: {e}")
+        return None
+    return response
 
 
 

@@ -1,3 +1,5 @@
+# chronomoment/settings.py
+
 """
 Django settings for chronomoment project.
 
@@ -20,12 +22,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# REPLACE THIS WITH A STRONG, UNIQUE KEY FOR PRODUCTION!
 SECRET_KEY = 'django-insecure-3x&%^^2dc3zs2chnt&r98()$%l&s&&%=+-)i5!*8b&!z+92dbd'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = True # Set to False for production deployments
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [] # Add your domain names/IPs here for production (e.g., ['yourdomain.com', 'www.yourdomain.com'])
 
 
 # Application definition
@@ -39,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'main.apps.MainConfig',
     'register.apps.RegisterConfig',
+    'storages', # ADDED: Required for django-storages (AWS S3 integration)
 ]
 
 MIDDLEWARE = [
@@ -56,10 +60,11 @@ ROOT_URLCONF = 'chronomoment.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')], # MODIFIED: Point to your project-level templates folder
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug', # ADDED: Useful for debug mode
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -72,14 +77,28 @@ WSGI_APPLICATION = 'chronomoment.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
+# Using PostgreSQL for production. Remember to install psycopg2-binary.
+# For local development, you might use SQLite initially, but switch to PostgreSQL for deployment.
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.sqlite3', # <-- CHANGED: Use SQLite engine
+        'NAME': BASE_DIR / 'db.sqlite3',        # <-- CHANGED: Point to your local SQLite file
     }
 }
+
+# SECURITY WARNING: For production, use environment variables for database credentials:
+# import os
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': os.environ.get('DB_NAME', 'chronoment_db'),
+#         'USER': os.environ.get('DB_USER', 'admin'),
+#         'PASSWORD': os.environ.get('DB_PASSWORD', 'your_strong_password'),
+#         'HOST': os.environ.get('DB_HOST', 'localhost'), # Use localhost for local dev, or the cloud host for production
+#         'PORT': os.environ.get('DB_PORT', '5432'),
+#         'CONN_MAX_AGE': 600,
+#     }
+# }
 
 
 # Password validation
@@ -106,65 +125,110 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'UTC' # Recommended to store all times in UTC for consistency
 
 USE_I18N = True
 
-USE_TZ = True
+USE_TZ = True # Keep this as True for timezone-aware datetimes
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # ADDED: For Django's collectstatic command
+
+
+# Media files (user uploads) - Configuration for AWS S3
+# These settings will override MEDIA_ROOT and MEDIA_URL for file storage if DEFAULT_FILE_STORAGE is S3.
+# MEDIA_ROOT and MEDIA_URL (local) are effectively ignored when S3 is the default.
+# You can keep them for local development fallback if DEFAULT_FILE_STORAGE is not S3,
+# but they are not used when S3 is active.
+# MEDIA_URL = '/media/' # This local MEDIA_URL is overridden by S3 config below
+# MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # This local MEDIA_ROOT is overridden by S3 config below
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Add your custom authentication backend
-# The path should be 'your_app_name.backends.OrganiserBackend'
-# Make sure to keep 'django.contrib.auth.backends.ModelBackend' if you want
-# to use Django's default User model (e.g., for Django Admin).
-AUTHENTICATION_BACKENDS = [
-    'main.backends.OrganiserBackend', # Your custom backend
-    'django.contrib.auth.backends.ModelBackend', # Django's default
-]
+# Custom User Model
+AUTH_USER_MODEL = 'main.Organisers' # Your custom user model
 
-# Optional: Tell Django what model your custom backend is managing users for
-# This is mainly for internal Django mechanisms and some third-party apps.
-# It doesn't replace the need for the custom backend for email login.
-AUTH_USER_MODEL = 'main.Organisers' # Use this if Organisers is your ONLY user model
-
-# Set the URL where Django will redirect users who are not logged in
-# (e.g., for @login_required decorator)
-LOGIN_URL = '/login/' # Or whatever your login URL name is, e.g., 'login'
-
-# URL to redirect after successful login (if not specified elsewhere)
-LOGIN_REDIRECT_URL = '/home/' # Or your actual home/dashboard URL
-
-# URL to redirect after logout
-LOGOUT_REDIRECT_URL = '/login/' # Or where you want users to go after logout
-
+# Login/Logout URLs
+LOGIN_URL = '/login/' # Your login URL
+LOGIN_REDIRECT_URL = '/home/' # Your actual home/dashboard URL after login
+LOGOUT_REDIRECT_URL = '/login/' # Where users go after logout
 
 
 # Email Configuration for Development (prints emails to your console)
 # This is ideal for testing during development as it doesn't require a real SMTP server.
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-# This email address will appear as the sender of the invitation emails.
-EMAIL_HOST_USER = 'demirtanriver@gmail.com' 
+EMAIL_HOST_USER = 'demirtanriver@gmail.com' # This email address will appear as the sender of the invitation emails.
 
 # For a production environment, you would typically use an SMTP backend
 # provided by an email service (e.g., SendGrid, Mailgun, AWS SES, Gmail SMTP).
 # Example for a real SMTP setup (uncomment and configure when deploying):
 # EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.example.com' # Replace with your SMTP host
+# EMAIL_HOST = 'smtp.gmail.com' # Example for Gmail SMTP
 # EMAIL_PORT = 587 # Common port for TLS
 # EMAIL_USE_TLS = True # Use TLS for secure connection
-# EMAIL_HOST_USER = 'your_smtp_username' # Your SMTP username
-# EMAIL_HOST_PASSWORD = 'your_smtp_password' # Your SMTP password
+# EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER') # Use environment variables for production
+# EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD') # Use environment variables for production
 
-# Media files (user-uploaded content)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # This will create a 'media' folder in your project root
+
+# --- AWS S3 Settings for Media Files ---
+# IMPORTANT: Use environment variables for sensitive credentials in production!
+# For local testing, you might temporarily hardcode them, but remove before committing.
+
+AWS_ACCESS_KEY_ID = 'AKIAUMYCIPB4ZB27WH57' # REPLACE THIS with your IAM user's Access Key ID
+AWS_SECRET_ACCESS_KEY = 'PlrtnGxNr/JDS6C1Oh+tXI5nHDIsoEl9XhRZset9' # REPLACE THIS with your IAM user's Secret Access Key
+AWS_STORAGE_BUCKET_NAME = 'chronoment' # REPLACE THIS with your S3 bucket name (e.g., 'chronoment-unique-bucket-123')
+AWS_S3_REGION_NAME = 'eu-north-1' # REPLACE THIS with your S3 bucket's region (e.g., 'eu-north-1', 'us-east-1')
+
+# Set default ACL to None for private uploads (recommended for user content).
+# This means files will NOT be publicly readable by default.
+AWS_DEFAULT_ACL = None 
+
+# Don't overwrite files with the same name. Django will append a unique string.
+AWS_S3_FILE_OVERWRITE = False
+
+# Set the default file storage to S3Boto3Storage from django-storages
+# This is the critical setting that tells Django to use S3 for FileField/ImageField.
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+# MEDIA_URL will now be used by Django to construct URLs for FileField/ImageField.
+# These URLs will need to be pre-signed to be accessible.
+MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/media/'
+
+
+# --- FINAL DEBUGGING CHECK FOR STORAGE (KEEP THIS FOR NOW) ---
+# This will print to your terminal when the Django server starts,
+# confirming which storage backend is actually active.
+print(f"DEBUG: Final DEFAULT_FILE_STORAGE: {DEFAULT_FILE_STORAGE}")
+print(f"DEBUG: AWS_STORAGE_BUCKET_NAME: {AWS_STORAGE_BUCKET_NAME}")
+print(f"DEBUG: AWS_S3_REGION_NAME: {AWS_S3_REGION_NAME}")
+# --- END FINAL DEBUGGING CHECK ---
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    
+}

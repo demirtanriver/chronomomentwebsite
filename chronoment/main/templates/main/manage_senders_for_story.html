@@ -10,23 +10,7 @@
         </h2>
         <p class="text-center text-gray-600 mb-6">
             You have invited {{ existing_story_senders.count }} out of {{ story.max_senders }} allowed senders.
-            
         </p>
-
-        {# Display Django messages #}
-        {% if messages %}
-            <div class="mb-6">
-                {% for message in messages %}
-                    <div class="px-4 py-3 rounded-md relative mb-2
-                        {% if message.tags == 'success' %}bg-green-100 border border-green-400 text-green-700{% endif %}
-                        {% if message.tags == 'error' %}bg-red-100 border border-red-400 text-red-700{% endif %}
-                        {% if message.tags == 'info' %}bg-blue-100 border border-blue-400 text-blue-700{% endif %}
-                        {% if message.tags == 'warning' %}bg-yellow-100 border border-yellow-400 text-yellow-700{% endif %}">
-                        <span class="block sm:inline">{{ message }}</span>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
 
         {# Section for Adding New Senders #}
         <div class="mb-10 p-6 border border-gray-200 rounded-lg shadow-sm">
@@ -37,42 +21,30 @@
                 
                 {{ formset.management_form }}
 
-                <div id="formset-container" class="space-y-4">
+                {# Added data-attributes for JavaScript to read values reliably #}
+                <div id="formset-container" 
+                     class="space-y-4"
+                     data-max-senders="{{ story.max_senders|default:0 }}"
+                     data-initial-existing-senders="{{ existing_story_senders.count|default:0 }}">
+                    {# Loop through forms provided by Django (e.g., if there were validation errors) #}
                     {% for form in formset %}
-                        <div class="sender-form border border-gray-100 p-4 rounded-lg bg-gray-50" data-form-id="{{ forloop.counter0 }}">
-                            <h5 class="text-lg font-medium text-gray-700 mb-3">Sender #{{ forloop.counter }}</h5>
+                        <div class="sender-form border border-gray-100 p-4 rounded-lg bg-gray-50 {% if form.errors %}border-red-200 bg-red-50{% endif %}" data-form-id="{{ forloop.counter0 }}">
+                            <h5 class="text-lg font-medium text-gray-700 mb-3">Sender #{{ forloop.counter }} {% if form.errors %}<span class="text-red-700">(Errors Below)</span>{% endif %}</h5>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label for="id_senders-{{ forloop.counter0 }}-email" class="block text-sm font-medium text-gray-700 mb-1">Sender Email</label>
-                                    <input type="email" 
-                                           name="senders-{{ forloop.counter0 }}-email" 
-                                           id="id_senders-{{ forloop.counter0 }}-email" 
-                                           value="{{ form.email.value|default_if_none:'' }}" 
-                                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm {% if form.email.errors %}border-red-500{% endif %}" 
-                                           placeholder="sender@example.com" 
-                                           {% if form.email.field.required %}required{% endif %}>
-                                    {% if form.email.help_text %}<p class="mt-2 text-sm text-gray-500">{{ form.email.help_text }}</p>{% endif %}
-                                    {% for error in form.email.errors %}<p class="text-sm text-red-600 mt-2">{{ error }}</p>{% endfor %}
+                                    <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Sender Email</label>
+                                    {{ form.email }} {# Render the email field using Django's form rendering #}
+                                    {% if form.email.errors %}<p class="mt-1 text-sm text-red-600">{{ form.email.errors }}</p>{% endif %}
+                                    <p class="mt-2 text-sm text-gray-500">Required. The email address of the person you want to invite.</p>
                                 </div>
                                 <div>
-                                    <label for="id_senders-{{ forloop.counter0 }}-name" class="block text-sm font-medium text-gray-700 mb-1">Sender Name (Optional)</label>
-                                    <input type="text" 
-                                           name="senders-{{ forloop.counter0 }}-name" 
-                                           id="id_senders-{{ forloop.counter0 }}-name" 
-                                           value="{{ form.name.value|default_if_none:'' }}" 
-                                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm {% if form.name.errors %}border-red-500{% endif %}" 
-                                           placeholder="e.g., Jane Doe">
-                                    {% if form.name.help_text %}<p class="mt-2 text-sm text-gray-500">{{ form.name.help_text }}</p>{% endif %}
-                                    {% for error in form.name.errors %}<p class="text-sm text-red-600 mt-2">{{ error }}</p>{% endfor %}
+                                    <label for="{{ form.name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Sender Name</label>
+                                    {{ form.name }} {# Render the name field using Django's form rendering #}
+                                    {% if form.name.errors %}<p class="mt-1 text-sm text-red-600">{{ form.name.errors }}</p>{% endif %}
+                                    <p class="mt-2 text-sm text-gray-500">Required. A name to identify this sender.</p>
                                 </div>
                             </div>
-                            {% if form.non_field_errors %}<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mt-4">{{ form.non_field_errors }}</div>{% endif %}
-                            {# Remove button for dynamically added forms #}
-                            {% if forloop.counter0 > 0 %}
-                                <button type="button" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out remove-form-button">
-                                    Remove Sender
-                                </button>
-                            {% endif %}
+                            <button type="button" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out remove-form-button">Remove Sender</button>
                         </div>
                     {% endfor %}
                 </div>
@@ -81,7 +53,7 @@
                     {# Dynamically adjust button text and visibility #}
                     {% if remaining_slots > 0 %}
                         <button type="button" id="add-more-senders" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-semibold text-white bg-indigo-500 hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
-                            Add Another Sender ({{ remaining_slots }} slot{{ remaining_slots|pluralize }} left)
+                            Add Another Sender (<span id="remaining-slots-text">{{ remaining_slots }}</span> slot{{ remaining_slots|pluralize }} left)
                         </button>
                     {% else %}
                         <p class="text-center text-gray-600 text-lg">You have reached the maximum number of senders ({{ story.max_senders }}) for this story.</p>
@@ -102,12 +74,27 @@
                 <h3 class="text-2xl font-semibold text-gray-800 mb-6">Existing Senders</h3>
                 <ul class="space-y-4">
                     {% for ss in existing_story_senders %}
-                        <li class="bg-gray-50 p-4 rounded-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between space-y-3 md:space-y-0 md:space-x-4">
+                        {# Dynamic background class based on invitation_status #}
+                        <li class="p-4 rounded-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between space-y-3 md:space-y-0 md:space-x-4
+                            {% if ss.invitation_status == 'pending' %}bg-yellow-50 border-yellow-200{% endif %}
+                            {% if ss.invitation_status == 'contributed' %}bg-blue-50 border-blue-200{% endif %}
+                            {% if ss.invitation_status == 'accepted' %}bg-green-50 border-green-200{% endif %}
+                            {% if ss.invitation_status == 'expired' %}bg-red-50 border-red-200{% endif %}
+                        ">
                             <div class="flex-grow">
                                 <p class="text-lg font-medium text-gray-800">{{ ss.sender.name|default:ss.sender.email }}</p>
                                 <p class="text-gray-600 text-sm">{{ ss.sender.email }}</p>
                                 <p class="text-gray-500 text-xs mt-1">
-                                    Status: <span class="font-semibold">{{ ss.invitation_status|capfirst }}</span>
+                                    Status: 
+                                    {% if ss.invitation_status == 'pending' %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
+                                    {% elif ss.invitation_status == 'contributed' %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Contributed</span>
+                                    {% elif ss.invitation_status == 'accepted' %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Accepted</span>
+                                    {% elif ss.invitation_status == 'expired' %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Expired</span>
+                                    {% endif %}
                                     {% if ss.token_expires_at %}
                                         | Expires: {{ ss.token_expires_at|date:"M j, Y H:i" }}
                                     {% endif %}
@@ -165,146 +152,119 @@
         const addMoreButton = document.getElementById('add-more-senders');
         const totalFormsInput = document.querySelector('#id_senders-TOTAL_FORMS');
         const maxFormsInput = document.querySelector('#id_senders-MAX_NUM_FORMS');
-        const remainingSlotsDisplay = document.getElementById('remaining-slots-display');
+        const remainingSlotsText = document.getElementById('remaining-slots-text'); // Get the span for live updates
 
-        // Store the initial existing senders count and story max senders from Django context
-        // Use parseInt and default:0 for robustness in case values are missing or non-numeric
-        const initialExistingSendersCount = parseInt("{{ existing_story_senders.count|default:0 }}");
-        const storyMaxSenders = parseInt("{{ story.max_senders|default:0 }}");
-
+        // Store the initial existing senders count and story max senders from data attributes
+        const initialExistingSendersCount = parseInt(formsetContainer.dataset.initialExistingSenders);
+        const storyMaxSenders = parseInt(formsetContainer.dataset.maxSenders);
 
         console.log("formsetContainer element:", formsetContainer);
         console.log("addMoreButton element:", addMoreButton);
         console.log("totalFormsInput element:", totalFormsInput);
         console.log("maxFormsInput element:", maxFormsInput);
-        console.log("remainingSlotsDisplay element:", remainingSlotsDisplay);
+        console.log("remainingSlotsText element:", remainingSlotsText);
         console.log("initialExistingSendersCount:", initialExistingSendersCount);
         console.log("storyMaxSenders:", storyMaxSenders);
 
-
         // Check if essential elements are found before proceeding
-        // The previous error was due to a Django tag inside a JS comment.
-        // This check ensures the core elements for the formset are present.
         if (!totalFormsInput || !maxFormsInput || !formsetContainer) {
             console.error("One or more formset management elements not found. Dynamic formset will not function.");
-
-            // in Django template was false, so the button was never rendered.
-            // No need to hide it if it doesn't exist.
             return;
         }
 
         let formIdx = parseInt(totalFormsInput.value);
 
+        // The template for new forms, defined directly in JavaScript for robustness.
+        // IMPORTANT: The `name` and `id` attributes must use `__prefix__` for Django formsets.
+        const emptyFormTemplateHtml = `
+            <div class="sender-form border border-gray-100 p-4 rounded-lg bg-gray-50">
+                <h5 class="text-lg font-medium text-gray-700 mb-3">Sender #__prefix_display__</h5>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="id_senders-__prefix__-email" class="block text-sm font-medium text-gray-700 mb-1">Sender Email</label>
+                        <input type="email" 
+                                name="senders-__prefix__-email" 
+                                id="id_senders-__prefix__-email" 
+                                value="" 
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                                placeholder="sender@example.com" 
+                                required>
+                        <p class="mt-2 text-sm text-gray-500">Required. The email address of the person you want to invite.</p>
+                    </div>
+                    <div>
+                        <label for="id_senders-__prefix__-name" class="block text-sm font-medium text-gray-700 mb-1">Sender Name</label>
+                        <input type="text" 
+                                name="senders-__prefix__-name" 
+                                id="id_senders-__prefix__-name" 
+                                value="" 
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                                placeholder="e.g., Jane Doe" 
+                                required>
+                        <p class="mt-2 text-sm text-gray-500">Required. A name to identify this sender.</p>
+                    </div>
+                </div>
+                <button type="button" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out remove-form-button">Remove Sender</button>
+            </div>
+        `;
+
         function updateAddButtonState() {
-            const currentEmptyFormsInFormset = formsetContainer.querySelectorAll('.sender-form').length;
-            const maxAllowedFormsForFormset = parseInt(maxFormsInput.value); 
+            const currentFormsInDom = formsetContainer.querySelectorAll('.sender-form').length;
+            const totalSendersIncludingNew = initialExistingSendersCount + currentFormsInDom;
+            const slotsLeft = storyMaxSenders - totalSendersIncludingNew;
             
-            const actualRemainingFormsInFormset = maxAllowedFormsForFormset - currentEmptyFormsInFormset;
+            if (remainingSlotsText) {
+                remainingSlotsText.textContent = Math.max(0, slotsLeft);
+            }
 
-            if (addMoreButton) { // Ensure button exists before trying to modify it
-                if (actualRemainingFormsInFormset > 0) {
-                    addMoreButton.style.display = 'block';
-                    addMoreButton.textContent = `Add Another Sender (${actualRemainingFormsInFormset} slot${actualRemainingFormsInFormset !== 1 ? 's' : ''} left)`;
+            if (addMoreButton) {
+                if (slotsLeft <= 0) {
+                    addMoreButton.style.display = 'none'; // Hide button if no slots left
                 } else {
-                    addMoreButton.style.display = 'none';
+                    addMoreButton.style.display = 'block'; // Show button if slots available
+                    addMoreButton.textContent = `Add Another Sender (${slotsLeft} slot${slotsLeft !== 1 ? 's' : ''} left)`;
                 }
             }
-            // Update the general remaining slots display at the top
-            const totalCurrentSenders = initialExistingSendersCount + currentEmptyFormsInFormset;
-            const overallRemainingSlots = Math.max(0, storyMaxSenders - totalCurrentSenders);
-            if (remainingSlotsDisplay) {
-                remainingSlotsDisplay.textContent = overallRemainingSlots;
+
+            // Update submit button state: enable if there's at least one new form, or if there were errors
+            const submitButton = document.querySelector('button[type="submit"]');
+            if (submitButton) {
+                const hasNewForms = currentFormsInDom > 0;
+                const hasErrors = formsetContainer.querySelector('.sender-form.border-red-200');
+
+                if (hasNewForms || hasErrors || initialExistingSendersCount > 0) { 
+                    submitButton.disabled = false;
+                    submitButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                    submitButton.classList.add('bg-green-600', 'hover:bg-green-700');
+                } else {
+                    submitButton.disabled = true;
+                    submitButton.classList.add('bg-gray-400', 'cursor-not-allowed');
+                    submitButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+                }
             }
         }
 
-
-        // Only attach event listener if the addMoreButton actually exists in the DOM
-        if (addMoreButton) { 
-            addMoreButton.addEventListener('click', function() {
-                console.log("Add More Senders button clicked.");
-                const maxForms = parseInt(maxFormsInput.value); 
-                console.log("Current formIdx (before add):", formIdx, "Max forms (from Django):", maxForms);
-
-                if (formIdx < maxForms) {
-                    const emptyFormHtml = `
-                        <div class="sender-form border border-gray-100 p-4 rounded-lg bg-gray-50" data-form-id="${formIdx}">
-                            <h5 class="text-lg font-medium text-gray-700 mb-3">Sender #${formIdx + 1}</h5>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="id_senders-${formIdx}-email" class="block text-sm font-medium text-gray-700 mb-1">Sender Email</label>
-                                    <input type="email" 
-                                           name="senders-${formIdx}-email" 
-                                           id="id_senders-${formIdx}-email" 
-                                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
-                                           placeholder="sender@example.com" 
-                                           required>
-                                    <p class="mt-2 text-sm text-gray-500">Required. The email address of the person you want to invite.</p>
-                                </div>
-                                <div>
-                                    <label for="id_senders-${formIdx}-name" class="block text-sm font-medium text-gray-700 mb-1">Sender Name (Optional)</label>
-                                    <input type="text" 
-                                           name="senders-${formIdx}-name" 
-                                           id="id_senders-${formIdx}-name" 
-                                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
-                                           placeholder="e.g., Jane Doe">
-                                    <p class="mt-2 text-sm text-gray-500">Optional. A name to identify this sender.</p>
-                                </div>
-                            </div>
-                            <button type="button" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out remove-form-button">Remove Sender</button>
-                        </div>
-                    `;
-                    
-                    const newForm = document.createElement('div');
-                    newForm.innerHTML = emptyFormHtml.trim();
-                    formsetContainer.appendChild(newForm.firstChild);
-
-                    totalFormsInput.value = formIdx + 1;
-                    formIdx++;
-
-                    console.log("Form added. New formIdx:", formIdx, "Total forms input value:", totalFormsInput.value);
-                    updateFormIndices();
-                    updateAddButtonState();
-                } else {
-                    console.log("Max forms reached. Cannot add more.");
-                }
-            });
-        }
-
-
-        formsetContainer.addEventListener('click', function(event) {
-            if (event.target.classList.contains('remove-form-button')) {
-                console.log("Remove Sender button clicked.");
-                const formToRemove = event.target.closest('.sender-form');
-                if (formToRemove) {
-                    formToRemove.remove();
-                    totalFormsInput.value = parseInt(totalFormsInput.value) - 1;
-                    formIdx--;
-                    console.log("Form removed. New formIdx:", formIdx, "Total forms input value:", totalFormsInput.value);
-                    updateFormIndices();
-                    updateAddButtonState();
-                }
-            }
-        });
-
+        // Function to update form indices and display numbers after add/remove
         function updateFormIndices() {
             const forms = formsetContainer.querySelectorAll('.sender-form');
             forms.forEach((formElement, index) => {
-                const oldFormId = formElement.dataset.formId;
-                const newFormId = index;
+                const oldFormId = formElement.dataset.formId; // Get the original data-form-id
+                const newFormId = index; // The new sequential index within the DOM
 
-                formElement.dataset.formId = newFormId;
+                formElement.dataset.formId = newFormId; // Update data-form-id
 
+                // Update input names and IDs
                 formElement.querySelectorAll('[name]').forEach(input => {
-                    if (input.name.includes(`senders-${oldFormId}`)) {
+                    if (input.name && input.name.includes(`senders-${oldFormId}`)) {
                         input.name = input.name.replace(`senders-${oldFormId}`, `senders-${newFormId}`);
                     }
                 });
                 formElement.querySelectorAll('[id]').forEach(input => {
-                    if (input.id.includes(`id_senders-${oldFormId}`)) {
+                    if (input.id && input.id.includes(`id_senders-${oldFormId}`)) {
                         input.id = input.id.replace(`id_senders-${oldFormId}`, `id_senders-${newFormId}`);
                     }
                 });
 
+                // Update label's for attribute
                 formElement.querySelectorAll('label').forEach(label => {
                     const forAttr = label.getAttribute('for');
                     if (forAttr && forAttr.includes(`id_senders-${oldFormId}`)) {
@@ -312,14 +272,17 @@
                     }
                 });
 
+                // Update heading number for display
                 const heading = formElement.querySelector('h5');
                 if (heading) {
-                    heading.textContent = `Sender #${newFormId + 1}`;
+                    heading.textContent = `Sender #${initialExistingSendersCount + newFormId + 1}`;
                 }
 
+                // Show/hide remove button based on if it's the only form
                 const removeButton = formElement.querySelector('.remove-form-button');
                 if (removeButton) {
-                    if (newFormId === 0) {
+                    // If there's only one form left (and no existing senders in DB), hide its remove button
+                    if (formsetContainer.querySelectorAll('.sender-form').length === 1 && initialExistingSendersCount === 0) {
                         removeButton.style.display = 'none';
                     } else {
                         removeButton.style.display = 'block';
@@ -328,9 +291,60 @@
             });
             console.log("Forms re-indexed.");
         }
-        
-        updateFormIndices();
-        updateAddButtonState();
+
+        // Add new form click handler
+        if (addMoreButton) { 
+            addMoreButton.addEventListener('click', function() {
+                console.log("Add More Senders button clicked.");
+                const currentFormsInDom = formsetContainer.querySelectorAll('.sender-form').length;
+                const totalSendersIncludingNew = initialExistingSendersCount + currentFormsInDom;
+
+                if (totalSendersIncludingNew < storyMaxSenders) {
+                    const newFormInstanceHtml = emptyFormTemplateHtml
+                        .replace(/__prefix__/g, formIdx) // Use formIdx for Django's internal prefix
+                        .replace(/__prefix_display__/g, initialExistingSendersCount + currentFormsInDom + 1); // For display number
+                    
+                    const newFormDiv = document.createElement('div');
+                    newFormDiv.innerHTML = newFormInstanceHtml.trim();
+                    formsetContainer.appendChild(newFormDiv.firstElementChild); // Append the actual div
+                    
+                    formIdx++; // Increment formIdx for the next new form
+                    totalFormsInput.value = formIdx; // Update the hidden TOTAL_FORMS input
+
+                    updateFormIndices(); // Re-index all forms for correct display and Django processing
+                    updateAddButtonState(); // Update slots and button state
+                } else {
+                    alert('Maximum number of senders reached.'); // Consider a custom modal for better UX
+                }
+            });
+        }
+
+        // Handle removing forms using event delegation
+        formsetContainer.addEventListener('click', function(event) {
+            if (event.target.classList.contains('remove-form-button')) {
+                console.log("Remove Sender button clicked.");
+                const formToRemove = event.target.closest('.sender-form');
+                if (formToRemove) {
+                    formToRemove.remove(); // Remove the form from the DOM
+                    formIdx--; // Decrement formIdx
+                    totalFormsInput.value = formIdx; // Update the hidden TOTAL_FORMS input
+
+                    updateFormIndices(); // Re-index remaining forms
+                    updateAddButtonState(); // Update slots and button state
+                }
+            }
+        });
+
+        // Initial form rendering logic on page load
+        const formsCurrentlyInDom = formsetContainer.querySelectorAll('.sender-form').length;
+        if (formsCurrentlyInDom === 0 && (storyMaxSenders - initialExistingSendersCount) > 0) {
+            if (addMoreButton) { // Ensure button exists before simulating click
+                addMoreButton.click();
+            }
+        } else {
+            updateFormIndices();
+            updateAddButtonState();
+        }
     });
 </script>
-{% endblock %}
+{% endblock content %}

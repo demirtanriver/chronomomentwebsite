@@ -188,26 +188,27 @@ class StoryForm(forms.ModelForm):
 
 
 # Form for a single Sender's details (NEW)
-class SenderForm(forms.Form):
+class SenderForm(forms.Form): # Changed from forms.ModelForm to forms.Form
+    name = forms.CharField(
+        label="Sender Name", # Changed label slightly
+        required=True, # Keeping as required based on your input
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            'class': 'mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
+            'placeholder': 'e.g., Jane Doe'
+        }),
+        help_text="Required. A name to identify this sender." # Updated help_text
+    )
     email = forms.EmailField(
         label="Sender Email",
         required=True,
         widget=forms.EmailInput(attrs={
-            'class': 'form-control',
+            'class': 'mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
             'placeholder': 'sender@example.com'
         }),
         help_text="Required. The email address of the person you want to invite."
     )
-    name = forms.CharField(
-        label="Sender Name (Optional)",
-        required=False,
-        max_length=255,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'e.g., Jane Doe'
-        }),
-        help_text="Optional. A name to identify this sender."
-    )
+    
 
 # FormSet for multiple SenderForms (NEW)
 # extra=1: Start with 1 empty form
@@ -251,37 +252,55 @@ class ImageContributionForm(forms.ModelForm):
         }
 
 class VideoContributionForm(forms.ModelForm):
+    # Define youtube_url as a form field, separate from the model's youtube_video_id
+    youtube_url = forms.URLField(
+        label="YouTube Video URL",
+        required=False,
+        help_text="Provide the full YouTube video URL (e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ)",
+        widget=forms.URLInput(attrs={
+            'class': 'mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
+            'placeholder': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+        })
+    )
+
     class Meta:
         model = VideoContribution
-        fields = ['video', 'youtube_url', 'caption'] # Include youtube_url field
+        # Include 'video' and 'caption' from the model, and 'youtube_video_id' (which will be set by clean method)
+        # Note: 'youtube_url' is a form-only field, not directly in Meta.fields
+        fields = ['video', 'youtube_video_id', 'caption'] # Keep youtube_video_id here as it's the model field
         widgets = {
             'video': forms.ClearableFileInput(attrs={
-                'class': 'mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer bg-gray-50 focus:outline-none focus:border-indigo-500'
+                'class': 'mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none'
             }),
-            'youtube_url': forms.URLInput(attrs={ # Use URLInput for proper validation and styling
+            # No widget needed for youtube_video_id here, as it's not directly input by user
+            'caption': forms.Textarea(attrs={
                 'class': 'mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
-                'placeholder': 'e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ'
-            }),
-            'caption': forms.TextInput(attrs={
-                'class': 'mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
-                'placeholder': 'Add a caption (optional)'
+                'rows': 3,
+                'placeholder': 'Add a caption for your video (optional)'
             }),
         }
         labels = {
             'video': 'Upload Video File',
-            'youtube_url': 'YouTube Video URL',
-            'caption': 'Video Caption',
+            'youtube_video_id': 'YouTube Video ID (Internal)', # Changed label to reflect it's not directly input
+            'caption': 'Caption',
         }
-        help_texts = {
-            'video': 'Upload a video file (MP4, MOV, etc.).',
-            'youtube_url': 'Or paste a YouTube video link. Only one video source (file or YouTube link) is allowed.',
-        }
+        # Hide youtube_video_id from the form, as it's handled internally
+        # You can do this by excluding it, or by making it a HiddenInput if it needs to be in fields
+        # For this scenario, we'll keep it in fields but rely on the clean method to set it.
+        # If you want to completely hide it from rendering, you can use a custom __init__ or exclude it.
+        # For now, the clean method will populate it.
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make youtube_video_id field hidden from direct user input
+        self.fields['youtube_video_id'].widget = forms.HiddenInput()
+        self.fields['youtube_video_id'].required = False # It's populated by clean method
 
     def clean(self):
         cleaned_data = super().clean()
         video_file = cleaned_data.get('video')
-        youtube_url = cleaned_data.get('youtube_url')
-        
+        youtube_url = self.cleaned_data.get('youtube_url') # Get from form field, not model field
+
         # Ensure that the youtube_video_id is cleared by default if not set
         cleaned_data['youtube_video_id'] = None 
 
@@ -305,11 +324,14 @@ class VideoContributionForm(forms.ModelForm):
             print(f"DEBUG: Extracted youtube_id from '{youtube_url}': {youtube_id}")
             if not youtube_id:
                 raise forms.ValidationError("Invalid YouTube URL. Please check the link.")
-            cleaned_data['youtube_video_id'] = youtube_id # Save extracted ID to cleaned_data
+            
+            cleaned_data['youtube_video_id'] = youtube_id # Save extracted ID to cleaned_data for the model
             cleaned_data['video'] = None # Ensure video file field is cleared if YouTube URL is used
         elif video_file:
-            cleaned_data['youtube_url'] = None
-            cleaned_data['youtube_video_id'] = None # Ensure this is explicitly cleared if file is used
+            # If video file is used, ensure youtube_url and youtube_video_id are cleared
+            # youtube_url is a form field, so it won't be in cleaned_data if not provided.
+            # We explicitly set youtube_video_id to None if a file is uploaded.
+            cleaned_data['youtube_video_id'] = None 
 
         print(f"DEBUG: Final cleaned_data['youtube_video_id']: {cleaned_data.get('youtube_video_id')}")
         return cleaned_data

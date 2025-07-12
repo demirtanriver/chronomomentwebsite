@@ -1,6 +1,11 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.utils import timezone
+from django.core.validators import FileExtensionValidator
+from storages.backends.s3boto3 import S3Boto3Storage
+from django.conf import settings
+import uuid # Assuming you use UUIDs for some models
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin # Assuming for Organisers model
 
 # Custom Manager for Organisers
 class OrganiserManager(BaseUserManager):
@@ -166,40 +171,75 @@ class StorySenders(models.Model):
 
 
 
-# Text Contribution Model
+# Base Contribution Model (Abstract)
+class BaseContribution(models.Model):
+    story_sender = models.ForeignKey(StorySenders, on_delete=models.CASCADE)
+    caption = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # NEW: Status field for contributions
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('ignored', 'Ignored'), # Will not be shown in slideshow, but kept
+    ]
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default='pending'
+    )
+
+    class Meta:
+        abstract = True
+        ordering = ['created_at'] # Default ordering for all contributions
+
+
+
+# --- ADD THIS SECTION ---
+CONTRIBUTION_STATUS_CHOICES = [
+    ('pending', 'Pending Review'),
+    ('approved', 'Approved'),
+    ('ignored', 'Ignored'),
+]
+# --- END ADD THIS SECTION ---
+
+# Define your S3 storage instance
+S3_MEDIA_STORAGE = S3Boto3Storage()
+
+# ... (rest of your models.py, including Organisers, Stories, Senders, StorySenders, etc.)
+
+class ImageContribution(models.Model):
+    story_sender = models.ForeignKey(StorySenders, on_delete=models.CASCADE, related_name='image_contributions')
+    image = models.ImageField(upload_to='contributions/images/', storage=S3_MEDIA_STORAGE)
+    caption = models.CharField(max_length=500, blank=True, null=True)
+    status = models.CharField(max_length=10, choices=CONTRIBUTION_STATUS_CHOICES, default='pending') # Uses the defined choices
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Image by {self.story_sender.sender.email} for {self.story_sender.story.title}"
+
+class VideoContribution(models.Model):
+    story_sender = models.ForeignKey(StorySenders, on_delete=models.CASCADE, related_name='video_contributions')
+    video = models.FileField(upload_to='contributions/videos/', blank=True, null=True, storage=S3_MEDIA_STORAGE)
+    youtube_video_id = models.CharField(max_length=20, blank=True, null=True)
+    caption = models.CharField(max_length=500, blank=True, null=True)
+    status = models.CharField(max_length=10, choices=CONTRIBUTION_STATUS_CHOICES, default='pending') # Uses the defined choices
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Video by {self.story_sender.sender.email} for {self.story_sender.story.title}"
+
+# ... (and your TextContribution model, which also uses this)
 class TextContribution(models.Model):
     story_sender = models.ForeignKey(StorySenders, on_delete=models.CASCADE, related_name='text_contributions')
     content = models.TextField()
-    is_approved = models.BooleanField(default=False) # NEW: Field for approval status
+    status = models.CharField(max_length=10, choices=CONTRIBUTION_STATUS_CHOICES, default='pending') # Uses the defined choices
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Text from {self.story_sender.sender.email} to {self.story_sender.story.title} (Approved: {self.is_approved})"
+        return f"Text by {self.story_sender.sender.email} for {self.story_sender.story.title}"
 
-# Image Contribution Model
-class ImageContribution(models.Model):
-    story_sender = models.ForeignKey(StorySenders, on_delete=models.CASCADE, related_name='image_contributions')
-    image = models.ImageField(upload_to='contributions/images/') 
-    caption = models.CharField(max_length=255, blank=True, null=True)
-    is_approved = models.BooleanField(default=False) # NEW: Field for approval status
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Image from {self.story_sender.sender.email} to {self.story_sender.story.title} (Approved: {self.is_approved})"
-
-# Video Contribution Model
-class VideoContribution(models.Model):
-    story_sender = models.ForeignKey(StorySenders, on_delete=models.CASCADE, related_name='video_contributions')
-    video = models.FileField(upload_to='contributions/videos/', blank=True, null=True) 
-    youtube_url = models.URLField(max_length=200, blank=True, null=True)
-    youtube_video_id = models.CharField(max_length=50, blank=True, null=True) 
-    caption = models.CharField(max_length=255, blank=True, null=True)
-    is_approved = models.BooleanField(default=False) # NEW: Field for approval status
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        if self.youtube_url:
-            return f"YouTube Video from {self.story_sender.sender.email} to {self.story_sender.story.title} (Approved: {self.is_approved})"
-        elif self.video:
-            return f"Uploaded Video from {self.story_sender.sender.email} to {self.story_sender.story.title} (Approved: {self.is_approved})"
-        return f"Video Contribution from {self.story_sender.sender.email} to {self.story_sender.story.title} (Approved: {self.is_approved})"
