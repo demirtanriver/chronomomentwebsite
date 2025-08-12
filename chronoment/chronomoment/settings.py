@@ -22,13 +22,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# REPLACE THIS WITH A STRONG, UNIQUE KEY FOR PRODUCTION!
-SECRET_KEY = 'django-insecure-3x&%^^2dc3zs2chnt&r98()$%l&s&&%=+-)i5!*8b&!z+92dbd'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-3x&%^^2dc3zs2chnt&r98()$%l&s&&%=+-)i5!*8b&!z+92dbd')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True # Set to False for production deployments
+DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = [] # Add your domain names/IPs here for production (e.g., ['yourdomain.com', 'www.yourdomain.com'])
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '.elasticbeanstalk.com',
+    '.amazonaws.com'
+]
 
 
 # Application definition
@@ -60,11 +64,11 @@ ROOT_URLCONF = 'chronomoment.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')], # MODIFIED: Point to your project-level templates folder
+        'DIRS': [os.path.join(BASE_DIR, 'templates')], 
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
-                'django.template.context_processors.debug', # ADDED: Useful for debug mode
+                'django.template.context_processors.debug', 
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -79,26 +83,25 @@ WSGI_APPLICATION = 'chronomoment.wsgi.application'
 # Database
 # Using PostgreSQL for production. Remember to install psycopg2-binary.
 # For local development, you might use SQLite initially, but switch to PostgreSQL for deployment.
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3', # <-- CHANGED: Use SQLite engine
-        'NAME': BASE_DIR / 'db.sqlite3',        # <-- CHANGED: Point to your local SQLite file
-    }
-}
-
-# SECURITY WARNING: For production, use environment variables for database credentials:
-# import os
 # DATABASES = {
 #     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': os.environ.get('DB_NAME', 'chronoment_db'),
-#         'USER': os.environ.get('DB_USER', 'admin'),
-#         'PASSWORD': os.environ.get('DB_PASSWORD', 'your_strong_password'),
-#         'HOST': os.environ.get('DB_HOST', 'localhost'), # Use localhost for local dev, or the cloud host for production
-#         'PORT': os.environ.get('DB_PORT', '5432'),
-#         'CONN_MAX_AGE': 600,
+#         'ENGINE': 'django.db.backends.sqlite3', # <-- CHANGED: Use SQLite engine
+#         'NAME': BASE_DIR / 'db.sqlite3',        # <-- CHANGED: Point to your local SQLite file
 #     }
 # }
+
+# Database configuration using environment variables
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('DB_NAME', 'postgres'),
+        'USER': os.environ.get('DB_USER', 'demir'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', '85321Gemoment8.'),
+        'HOST': os.environ.get('DB_HOST', 'gemomentdatabase.cr26ey8gmw69.eu-north-1.rds.amazonaws.com'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
+        'CONN_MAX_AGE': 600,
+    }
+}
 
 
 # Password validation
@@ -162,30 +165,28 @@ LOGIN_REDIRECT_URL = '/home/' # Your actual home/dashboard URL after login
 LOGOUT_REDIRECT_URL = '/login/' # Where users go after logout
 
 
-# Email Configuration for Development (prints emails to your console)
-# This is ideal for testing during development as it doesn't require a real SMTP server.
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-EMAIL_HOST_USER = 'demirtanriver@gmail.com' # This email address will appear as the sender of the invitation emails.
-
-# For a production environment, you would typically use an SMTP backend
-# provided by an email service (e.g., SendGrid, Mailgun, AWS SES, Gmail SMTP).
-# Example for a real SMTP setup (uncomment and configure when deploying):
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.gmail.com' # Example for Gmail SMTP
-# EMAIL_PORT = 587 # Common port for TLS
-# EMAIL_USE_TLS = True # Use TLS for secure connection
-# EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER') # Use environment variables for production
-# EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD') # Use environment variables for production
+# Email Configuration - Development vs Production
+if DEBUG:
+    # Development: Print emails to console
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'demirtanriver@gmail.com')
+else:
+    # Production: Use SMTP backend
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+    EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'demirtanriver@gmail.com')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 
 
 # --- AWS S3 Settings for Media Files ---
-# IMPORTANT: Use environment variables for sensitive credentials in production!
-# For local testing, you might temporarily hardcode them, but remove before committing.
+# Using environment variables for production security
 
-AWS_ACCESS_KEY_ID = 'AKIAUMYCIPB4ZB27WH57' # REPLACE THIS with your IAM user's Access Key ID
-AWS_SECRET_ACCESS_KEY = 'PlrtnGxNr/JDS6C1Oh+tXI5nHDIsoEl9XhRZset9' # REPLACE THIS with your IAM user's Secret Access Key
-AWS_STORAGE_BUCKET_NAME = 'chronoment' # REPLACE THIS with your S3 bucket name (e.g., 'chronoment-unique-bucket-123')
-AWS_S3_REGION_NAME = 'eu-north-1' # REPLACE THIS with your S3 bucket's region (e.g., 'eu-north-1', 'us-east-1')
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIAUMYCIPB4ZB27WH57')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', 'PlrtnGxNr/JDS6C1Oh+tXI5nHDIsoEl9XhRZset9')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', 'chronoment')
+AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'eu-north-1')
 
 # Set default ACL to None for private uploads (recommended for user content).
 # This means files will NOT be publicly readable by default.
@@ -203,13 +204,7 @@ DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/media/'
 
 
-# --- FINAL DEBUGGING CHECK FOR STORAGE (KEEP THIS FOR NOW) ---
-# This will print to your terminal when the Django server starts,
-# confirming which storage backend is actually active.
-print(f"DEBUG: Final DEFAULT_FILE_STORAGE: {DEFAULT_FILE_STORAGE}")
-print(f"DEBUG: AWS_STORAGE_BUCKET_NAME: {AWS_STORAGE_BUCKET_NAME}")
-print(f"DEBUG: AWS_S3_REGION_NAME: {AWS_S3_REGION_NAME}")
-# --- END FINAL DEBUGGING CHECK ---
+# Production logging configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
