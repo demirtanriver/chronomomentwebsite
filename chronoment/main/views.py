@@ -1,44 +1,34 @@
 from django.forms import formset_factory
-from django.shortcuts import render
-from django.http import HttpResponse,HttpResponseRedirect
-from .forms import CreateNewForm,OrganiserForm
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponse, HttpResponseRedirect
+from django.urls import reverse
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
+from django.contrib.auth.forms import AuthenticationForm
+from django.db import models
+from django.core.serializers.json import DjangoJSONEncoder
+from django.core.mail import send_mail
+from django.conf import settings
+from django.utils import timezone
+from itertools import chain
+import uuid
+import json
+import boto3
+from botocore.exceptions import ClientError
+from datetime import datetime, time
+
 from .forms import (
-    OrganiserForm, StoryForm, SenderForm,
-    TextContributionForm, ImageContributionForm, VideoContributionForm # NEW IMPORTS
+    CreateNewForm, OrganiserForm, StoryForm, SenderForm,
+    TextContributionForm, ImageContributionForm, VideoContributionForm,
+    SenderFormSet
 )
-# Import all models
+
 from .models import (
     Organisers, Stories, Senders, StorySenders,
-    TextContribution, ImageContribution, VideoContribution # NEW IMPORTS
+    TextContribution, ImageContribution, VideoContribution
 )
-from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse
-from django.contrib import messages # For displaying success/error messages
-from django.contrib.auth.decorators import login_required # To ensure only logged-in users can create stories
-import uuid # Used for generating a unique part of the QR code URL
 
-# Make sure to import your StoryForm and Stories model
-from .forms import StoryForm 
-from .models import Stories, Organisers
-
-from django.shortcuts import render, redirect
-from django.urls import reverse
-from django.contrib import messages
-from django.contrib.auth import authenticate, login as auth_login 
-from django.contrib.auth.forms import AuthenticationForm
-
-from django.shortcuts import render, redirect
-from django.urls import reverse
-from django.contrib import messages
-from django.contrib.auth import authenticate, login as auth_login # Renamed login to avoid conflict
-from django.contrib.auth.forms import AuthenticationForm # This form provides 'username' and 'password' fields
-from itertools import chain
-from django.db import models
-import json # <--- NEW: Import json module
-from django.core.serializers.json import DjangoJSONEncoder
-from datetime import datetime, time
-import boto3 # <-- ADD THIS IMPORT
-from botocore.exceptions import ClientError
 # Create your views here.
 
 def index(response,id):
@@ -212,7 +202,6 @@ def story_detail(request, story_id):
     }
     return render(request, 'main/story_detail.html', context)
 
-from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout # Ensure logout is imported
 # User Logout View
 @login_required # Ensures only logged-in users can initiate logout
 def user_logout(request):
@@ -223,20 +212,6 @@ def user_logout(request):
     messages.info(request, "You have been logged out.")
     return redirect(reverse('login')) # Redirect to the login page after logout
 
-
-from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse
-from django.contrib import messages
-from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
-from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth.decorators import login_required
-from django.core.mail import send_mail # For sending emails
-from django.conf import settings # To access settings like EMAIL_HOST_USER
-from django.utils import timezone # For token expiration
-import uuid # For generating unique tokens
-
-from .forms import OrganiserForm, StoryForm, SenderFormSet # Import SenderFormSet
-from .models import Organisers, Stories, Senders, StorySenders 
 
 # Helper function to send invitation email (NEW)
 def send_invitation_email(sender_email, sender_name, story_title, invitation_link):
@@ -767,9 +742,6 @@ def view_story_by_topper(request, topper_identifier):
 # Original view_revealed_story (now potentially redundant if view_story_by_topper is the primary public view)
 # You can remove this or keep it if you foresee another use case for direct story_id access
 # without a topper identifier. For now, view_story_by_topper covers the public viewing.
-# If you keep it, ensure it's named differently than 'view_revealed_story_public' in urls.py
-# and update any internal links that might still point to it.
-# For simplicity, I'm assuming view_story_by_topper will be the only public access.
 # If you need this specific view with story_id directly, we can re-add it with a different URL name.
 # For now, I'm leaving it as is, but its URL name was removed from urls.py.
 def view_revealed_story(request, story_id):

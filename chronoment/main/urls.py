@@ -18,17 +18,12 @@ urlpatterns = [
     path('topper/<str:topper_identifier>/', views.view_story_by_topper, name='view_story_by_topper'),
     path('revealed-story/<int:story_id>/', views.view_revealed_story, name='view_revealed_story'), # This is currently redundant
     path('story/<int:story_id>/sender/<int:story_sender_id>/contributions/', views.view_sender_contributions, name='view_sender_contributions'),
-
-    # Contribution Management URLs (Approved/Ignored/Deleted)
     path('contributions/text/<int:pk>/approve/', views.approve_text_contribution, name='approve_text_contribution'),
     path('contributions/image/<int:pk>/approve/', views.approve_image_contribution, name='approve_image_contribution'),
     path('contributions/video/<int:pk>/approve/', views.approve_video_contribution, name='approve_video_contribution'),
-
-    # NEW: Ignore Contribution URLs
     path('contributions/text/<int:pk>/ignore/', views.ignore_text_contribution, name='ignore_text_contribution'),
     path('contributions/image/<int:pk>/ignore/', views.ignore_image_contribution, name='ignore_image_contribution'),
     path('contributions/video/<int:pk>/ignore/', views.ignore_video_contribution, name='ignore_video_contribution'),
-
     path('contributions/text/<int:pk>/delete/', views.delete_text_contribution, name='delete_text_contribution'),
     path('contributions/image/<int:pk>/delete/', views.delete_image_contribution, name='delete_image_contribution'),
     path('contributions/video/<int:pk>/delete/', views.delete_video_contribution, name='delete_video_contribution'),

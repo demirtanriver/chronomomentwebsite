@@ -17,14 +17,10 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+#keep secret 
+SECRET_KEY = os.environ.get('SECRET_KEY')
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-3x&%^^2dc3zs2chnt&r98()$%l&s&&%=+-)i5!*8b&!z+92dbd')
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = [
@@ -33,9 +29,6 @@ ALLOWED_HOSTS = [
     '.elasticbeanstalk.com',
     '.amazonaws.com'
 ]
-
-
-# Application definition
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -80,32 +73,17 @@ TEMPLATES = [
 WSGI_APPLICATION = 'chronomoment.wsgi.application'
 
 
-# Database
-# Using PostgreSQL for production. Remember to install psycopg2-binary.
-# For local development, you might use SQLite initially, but switch to PostgreSQL for deployment.
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3', # <-- CHANGED: Use SQLite engine
-#         'NAME': BASE_DIR / 'db.sqlite3',        # <-- CHANGED: Point to your local SQLite file
-#     }
-# }
-
-# Database configuration using environment variables
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'postgres'),
-        'USER': os.environ.get('DB_USER', 'demir'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', '85321Gemoment8.'),
-        'HOST': os.environ.get('DB_HOST', 'gemomentdatabase.cr26ey8gmw69.eu-north-1.rds.amazonaws.com'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+        'NAME': os.environ.get('DB_NAME'),
+        'USER': os.environ.get('DB_USER'),
+        'PASSWORD': os.environ.get('DB_PASSWORD'),
+        'HOST': os.environ.get('DB_HOST'),
+        'PORT': os.environ.get('DB_PORT'),
         'CONN_MAX_AGE': 600,
     }
 }
-
-
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -122,17 +100,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC' # Recommended to store all times in UTC for consistency
+TIME_ZONE = 'UTC' 
 
 USE_I18N = True
 
-USE_TZ = True # Keep this as True for timezone-aware datetimes
+USE_TZ = True #timezone aware datetimes
 
 
 # Static files (CSS, JavaScript, Images)
@@ -141,18 +115,6 @@ USE_TZ = True # Keep this as True for timezone-aware datetimes
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # ADDED: For Django's collectstatic command
 
-
-# Media files (user uploads) - Configuration for AWS S3
-# These settings will override MEDIA_ROOT and MEDIA_URL for file storage if DEFAULT_FILE_STORAGE is S3.
-# MEDIA_ROOT and MEDIA_URL (local) are effectively ignored when S3 is the default.
-# You can keep them for local development fallback if DEFAULT_FILE_STORAGE is not S3,
-# but they are not used when S3 is active.
-# MEDIA_URL = '/media/' # This local MEDIA_URL is overridden by S3 config below
-# MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # This local MEDIA_ROOT is overridden by S3 config below
-
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -180,13 +142,11 @@ else:
     EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 
 
-# --- AWS S3 Settings for Media Files ---
-# Using environment variables for production security
-
-AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIAUMYCIPB4ZB27WH57')
-AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
-AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', 'chronoment')
-AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'eu-north-1')
+# AWS S3 Settings for Media Files 
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME')
 
 # Set default ACL to None for private uploads (recommended for user content).
 # This means files will NOT be publicly readable by default.
